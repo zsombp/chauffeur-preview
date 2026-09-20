@@ -329,11 +329,18 @@
         /* cover-fit the 16:9 frame into whatever shape the canvas box has */
         var cw = canvas.clientWidth, ch = canvas.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
         if (canvas.width !== Math.round(cw * dpr) || canvas.height !== Math.round(ch * dpr)) { canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr); }
-        var s2 = Math.max(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
-        var w2 = img.naturalWidth * s2, h2 = img.naturalHeight * s2;
-        /* the move ends on the right half of the frame: bias the crop there on narrow screens */
-        var fx = small ? 0.5 + 0.18 * p : 0.5;
-        ctx.drawImage(img, (canvas.width - w2) * fx, (canvas.height - h2) / 2, w2, h2);
+        var nw = img.naturalWidth, nh = img.naturalHeight, W2 = canvas.width, H2 = canvas.height;
+        if (W2 / H2 < 1.25) {
+          /* tall box (phones): the car must stay whole, so fit by width with a little zoom and let the studio
+             wall and floor run on above and below by stretching the frame's first and last rows */
+          var w3 = W2 * 1.28, h3 = w3 * nh / nw, x3 = (W2 - w3) / 2, y3 = (H2 - h3) / 2;
+          ctx.drawImage(img, 0, 0, nw, 2, 0, 0, W2, Math.ceil(y3) + 1);
+          ctx.drawImage(img, 0, nh - 2, nw, 2, 0, Math.floor(y3 + h3) - 1, W2, Math.ceil(H2 - y3 - h3) + 2);
+          ctx.drawImage(img, x3, y3, w3, h3);
+        } else {
+          var s2 = Math.max(W2 / nw, H2 / nh), w2 = nw * s2, h2 = nh * s2;
+          ctx.drawImage(img, (W2 - w2) / 2, (H2 - h2) / 2, w2, h2);
+        }
         drawn = img._i; canvas.classList.add('is-ready');
       }
       caps.forEach(function (c2, k) { var a = k / caps.length, b2 = (k + 1) / caps.length; c2.classList.toggle('is-on', p >= a + 0.04 && p < b2 - 0.02 || (k === caps.length - 1 && p >= a + 0.04)); });
