@@ -290,6 +290,10 @@
       if (qr.selectedOptions[0] && qr.selectedOptions[0].disabled) { var f = $$('option', qr).filter(function (o) { return !o.disabled; })[0]; if (f) qr.value = f.value; }
       var product = qr.value, cls = qc.value, pr = priceFor(product, cls);
       while (out.firstChild) out.removeChild(out.firstChild);
+      /* say which class and journey the figure belongs to: the hero says from 65, this box may say 75 */
+      var what = d.createElement('span'); what.className = 'quick__what';
+      what.textContent = (qc.selectedOptions[0] ? qc.selectedOptions[0].textContent : '') + (qr.selectedOptions[0] ? ', ' + qr.selectedOptions[0].textContent : '');
+      out.appendChild(what);
       var strong = d.createElement('strong'); strong.className = 'num';
       strong.textContent = pr ? pr.text : L.on_request; out.appendChild(strong);
       var span = d.createElement('span');

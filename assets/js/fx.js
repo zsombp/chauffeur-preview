@@ -18,7 +18,7 @@
     var store = function (v) { try { if (v === undefined) return localStorage.getItem('inertia'); localStorage.setItem('inertia', v); } catch (e) { return null; } };
     var q = /[?&]inertia=(on|off)/.exec(location.search); if (q) store(q[1]);
     var on = store() !== 'off';
-    var target = window.scrollY, cur = target, running = false, last = 0;
+    var target = window.scrollY, cur = target, running = false, last = 0, frame = 0;
     var TAU = 115;                 /* ms; higher = heavier */
     var limit = function () { return Math.max(0, root.scrollHeight - window.innerHeight); };
     var loop = function (now) {
@@ -26,11 +26,12 @@
       cur += (target - cur) * (1 - Math.exp(-dt / TAU));
       if (Math.abs(target - cur) < 0.4) { cur = target; running = false; }
       window.scrollTo(0, cur);
-      if (running) requestAnimationFrame(loop);
+      frame = running ? requestAnimationFrame(loop) : 0;
     };
+    var halt = function () { running = false; if (frame) { cancelAnimationFrame(frame); frame = 0; } target = cur = window.scrollY; };
     var go = function (y) {
       target = Math.max(0, Math.min(limit(), y));
-      if (!running) { running = true; last = 0; cur = window.scrollY; requestAnimationFrame(loop); }
+      if (!running) { running = true; last = 0; cur = window.scrollY; frame = requestAnimationFrame(loop); }
     };
     var scrollsItself = function (node) {
       for (; node && node !== d.body && node.nodeType === 1; node = node.parentElement) {
@@ -40,7 +41,7 @@
       return false;
     };
     window.addEventListener('wheel', function (e) {
-      if (!on || e.ctrlKey || e.metaKey || e.defaultPrevented) return;   /* pinch zoom, browser zoom */
+      if (!on || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return;   /* zoom, sideways */
       if (d.querySelector('dialog[open]') || scrollsItself(e.target)) return;
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;               /* sideways swipes stay native */
       e.preventDefault();
@@ -49,7 +50,9 @@
     }, { passive: false });
     /* anything that moves the page without us (keys, scrollbar, anchors, the browser) resets the target */
     window.addEventListener('scroll', function () { if (!running) { target = cur = window.scrollY; } }, { passive: true });
-    d.addEventListener('keydown', function () { running = false; });
+    d.addEventListener('keydown', halt);
+    window.addEventListener('pointerdown', halt, { passive: true });   /* scrollbar drag, middle click */
+    matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', function (e) { if (e.matches) { on = false; halt(); } });
     d.addEventListener('click', function (e) {
       var a = e.target.closest && e.target.closest('a[href^="#"]');
       if (!on || !a || a.getAttribute('href').length < 2) return;
@@ -65,7 +68,7 @@
       var label = tog.querySelector('[data-inertia-state]'), words = [d.body.getAttribute('data-inertia-on') || 'on', d.body.getAttribute('data-inertia-off') || 'off'];
       var paint = function () { tog.setAttribute('aria-pressed', on ? 'true' : 'false'); if (label) label.textContent = on ? words[0] : words[1]; };
       wrap.hidden = false; paint();
-      tog.addEventListener('click', function () { on = !on; running = false; target = cur = window.scrollY; store(on ? 'on' : 'off'); paint(); });
+      tog.addEventListener('click', function () { on = !on; halt(); store(on ? 'on' : 'off'); paint(); });
     }
   }
 
@@ -74,29 +77,36 @@
      find-in-page, keyboard and no-JS behaviour are untouched. */
   if (Element.prototype.animate) {
     Array.prototype.forEach.call(d.querySelectorAll('.faq details'), function (det) {
-      var sum = det.querySelector('summary'), anim = null;
+      var sum = det.querySelector('summary'), anim = null, turn = 0;
       if (!sum) return;
       sum.addEventListener('click', function (e) {
         e.preventDefault();
+        var mine = ++turn, from = det.offsetHeight, opening = !det.open || det.classList.contains('is-closing');
         if (anim) anim.cancel();
-        var from = det.offsetHeight, opening = !det.open;
+        det.classList.remove('is-closing');
         if (opening) det.open = true;
-        var to = opening ? det.offsetHeight : sum.offsetHeight + (det.offsetHeight - det.clientHeight);
+        var to = opening ? det.scrollHeight : sum.offsetHeight;
         det.style.overflow = 'hidden';
         if (!opening) det.classList.add('is-closing');
-        anim = det.animate({ height: [from + 'px', to + 'px'] }, { duration: opening ? 360 : 280, easing: 'cubic-bezier(.4,0,.6,1)' });
-        anim.onfinish = anim.oncancel = function () { if (!opening) det.open = false; det.classList.remove('is-closing'); det.style.overflow = ''; anim = null; };
+        var a2 = anim = det.animate({ height: [from + 'px', to + 'px'] }, { duration: opening ? 360 : 280, easing: 'cubic-bezier(.4,0,.6,1)' });
+        /* finish by the animation or by the clock, whichever comes first: a throttled tab must not leave a row stuck */
+        var done = function () { if (mine !== turn) return; turn++; if (!opening) det.open = false; det.classList.remove('is-closing'); det.style.overflow = ''; if (anim === a2) { anim = null; a2.cancel(); } };
+        a2.onfinish = done; setTimeout(done, (opening ? 360 : 280) + 90);
       });
     });
-    /* the quote sheet leaves as gracefully as it arrives */
+    /* the quote sheet leaves as gracefully as it arrives. The native close() stays untouched: the exit is
+       played from the things a person uses to close it (button, backdrop, Escape), then close() is called. */
     Array.prototype.forEach.call(d.querySelectorAll('dialog.sheet'), function (dlg) {
-      var nativeClose = dlg.close.bind(dlg), leaving = false;
-      dlg.close = function (v) {
+      var leaving = false;
+      var leave = function () {
         if (leaving || !dlg.open) return;
         leaving = true; dlg.classList.add('is-closing');
-        setTimeout(function () { dlg.classList.remove('is-closing'); leaving = false; nativeClose(v); }, 210);
+        setTimeout(function () { dlg.classList.remove('is-closing'); leaving = false; if (dlg.open) dlg.close(); }, 210);
       };
-      dlg.addEventListener('cancel', function (e) { e.preventDefault(); dlg.close(); });
+      dlg.addEventListener('cancel', function (e) { e.preventDefault(); leave(); });
+      dlg.addEventListener('click', function (e) {
+        if (e.target === dlg || (e.target.closest && e.target.closest('[data-close-quote]'))) { e.stopImmediatePropagation(); e.preventDefault(); leave(); }
+      }, true);
     });
   }
 
