@@ -304,12 +304,79 @@
     sync();
   }
 
+  /* ---------- scroll film ----------
+     A rendered image sequence scrubbed by scroll position on a pinned canvas. It only switches on when the
+     visitor has not asked for reduced motion or data saving; otherwise the poster and the captions stay as a
+     normal static block. Frames load after the page is idle: every fourth first, then the gaps. */
+  var film = $('[data-film]');
+  var conn = navigator.connection || {};
+  if (film && 'IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches && !conn.saveData) {
+    var small = matchMedia('(max-width: 760px)').matches;
+    var count = parseInt(film.getAttribute(small ? 'data-count-m' : 'data-count'), 10);
+    var base = film.getAttribute('data-base') + (small ? 'm' : 'd') + '-';
+    var canvas = $('canvas', film), ctx = canvas.getContext('2d'), caps = $$('[data-cap]', film);
+    var frames = new Array(count), drawn = -1, started = false, cur = 0;
+    var nearest = function (i) { for (var d2 = 0; d2 < count; d2++) { if (frames[i - d2]) return frames[i - d2]; if (frames[i + d2]) return frames[i + d2]; } return null; };
+    var draw = function () {
+      var r = film.getBoundingClientRect(), span = r.height - window.innerHeight;
+      var target = span > 0 ? Math.min(1, Math.max(0, -r.top / span)) : 0;
+      /* the picture eases after the scroll position instead of snapping to it */
+      cur += (target - cur) * 0.14;
+      if (Math.abs(target - cur) < 0.0006) cur = target;
+      var p = cur;
+      var i = Math.round(p * (count - 1)), img = nearest(i);
+      if (img && img._i !== drawn) {
+        /* cover-fit the 16:9 frame into whatever shape the canvas box has */
+        var cw = canvas.clientWidth, ch = canvas.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
+        if (canvas.width !== Math.round(cw * dpr) || canvas.height !== Math.round(ch * dpr)) { canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr); }
+        var s2 = Math.max(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
+        var w2 = img.naturalWidth * s2, h2 = img.naturalHeight * s2;
+        /* the move ends on the right half of the frame: bias the crop there on narrow screens */
+        var fx = small ? 0.5 + 0.18 * p : 0.5;
+        ctx.drawImage(img, (canvas.width - w2) * fx, (canvas.height - h2) / 2, w2, h2);
+        drawn = img._i; canvas.classList.add('is-ready');
+      }
+      caps.forEach(function (c2, k) { var a = k / caps.length, b2 = (k + 1) / caps.length; c2.classList.toggle('is-on', p >= a + 0.04 && p < b2 - 0.02 || (k === caps.length - 1 && p >= a + 0.04)); });
+      if (cur !== target) onMove();
+    };
+    var tick = false, onMove = function () { if (!tick) { tick = true; requestAnimationFrame(function () { tick = false; draw(); }); } };
+    var load = function (i) { var im = new Image(); im.decoding = 'async'; im._i = i; im.onload = function () { frames[i] = im; if (drawn < 0 || Math.abs(i - drawn) < 3) { drawn = -1; onMove(); } }; im.src = base + ('00' + i).slice(-3) + '.webp'; };
+    var start = function () {
+      if (started) return; started = true;
+      film.classList.add('is-live');
+      var order = [], i2;
+      for (i2 = 0; i2 < count; i2 += 4) order.push(i2);
+      for (i2 = 0; i2 < count; i2++) if (i2 % 4) order.push(i2);
+      order.forEach(function (n, k) { setTimeout(function () { load(n); }, k * 12); });
+      window.addEventListener('scroll', onMove, { passive: true }); window.addEventListener('resize', function () { drawn = -1; onMove(); });
+      onMove();
+    };
+    /* start when the film is within two screens, and never before the page has settled */
+    var fio = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { fio.disconnect(); if (window.requestIdleCallback) requestIdleCallback(start, { timeout: 1500 }); else setTimeout(start, 1); } }, { rootMargin: '200% 0px' });
+    fio.observe(film);
+  }
+
   /* ---------- reveal ----------
      Content is visible by default. It is only hidden for the entrance once the observer certainly exists. */
   var items = $$('.reveal');
   if ('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     var io = new IntersectionObserver(function (es) { es.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('is-in'); io.unobserve(en.target); } }); }, { rootMargin: '0px 0px -8% 0px' });
     root.classList.add('motion-ready');
+    /* Statement headlines rise word by word. The heading keeps its text for assistive tech via aria-label. */
+    $$('.statement h2').forEach(function (h) {
+      var words = h.textContent.trim().split(/\s+/);
+      h.setAttribute('aria-label', h.textContent.trim());
+      h.textContent = '';
+      words.forEach(function (w, n) {
+        var outer = d.createElement('span'), inner = d.createElement('span');
+        outer.className = 'w'; outer.setAttribute('aria-hidden', 'true');
+        inner.style.setProperty('--i', n); inner.textContent = w;
+        outer.appendChild(inner); h.appendChild(outer);
+        if (n < words.length - 1) h.appendChild(d.createTextNode(' '));
+      });
+      h.classList.add('reveal-words'); items.push(h);
+    });
+    $$('[data-route-line]').forEach(function (n) { items.push(n); });
     items.forEach(function (n) { io.observe(n); });
   }
 })();
