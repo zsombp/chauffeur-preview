@@ -11,21 +11,26 @@
 
   /* ---------- 1. inertia scrolling ----------
      The wheel sets a target; the page eases towards it, so a flick carries on and settles like something with
-     mass. Native scrolling stays in charge of everything else: touch, keyboard, scrollbar drag, find-in-page. */
+     mass. Native scrolling stays in charge of everything else: touch, keyboard, scrollbar drag, find-in-page.
+     Easing is measured in time, so it feels the same at 60 and 120 Hz. It can be switched off: the footer has
+     a toggle (remembered in this browser) and ?inertia=off in the address does the same. */
   if (fine) {
-    var target = window.scrollY, cur = target, running = false;
-    var EASE = 0.09;               /* lower = heavier */
-    root.style.scrollBehavior = 'auto';
+    var store = function (v) { try { if (v === undefined) return localStorage.getItem('inertia'); localStorage.setItem('inertia', v); } catch (e) { return null; } };
+    var q = /[?&]inertia=(on|off)/.exec(location.search); if (q) store(q[1]);
+    var on = store() !== 'off';
+    var target = window.scrollY, cur = target, running = false, last = 0;
+    var TAU = 115;                 /* ms; higher = heavier */
     var limit = function () { return Math.max(0, root.scrollHeight - window.innerHeight); };
-    var loop = function () {
-      cur += (target - cur) * EASE;
-      if (Math.abs(target - cur) < 0.35) { cur = target; running = false; }
+    var loop = function (now) {
+      var dt = Math.min(48, now - (last || now - 16)); last = now;
+      cur += (target - cur) * (1 - Math.exp(-dt / TAU));
+      if (Math.abs(target - cur) < 0.4) { cur = target; running = false; }
       window.scrollTo(0, cur);
       if (running) requestAnimationFrame(loop);
     };
     var go = function (y) {
       target = Math.max(0, Math.min(limit(), y));
-      if (!running) { running = true; cur = window.scrollY; requestAnimationFrame(loop); }
+      if (!running) { running = true; last = 0; cur = window.scrollY; requestAnimationFrame(loop); }
     };
     var scrollsItself = function (node) {
       for (; node && node !== d.body && node.nodeType === 1; node = node.parentElement) {
@@ -35,7 +40,7 @@
       return false;
     };
     window.addEventListener('wheel', function (e) {
-      if (e.ctrlKey || e.metaKey || e.defaultPrevented) return;          /* pinch zoom, browser zoom */
+      if (!on || e.ctrlKey || e.metaKey || e.defaultPrevented) return;   /* pinch zoom, browser zoom */
       if (d.querySelector('dialog[open]') || scrollsItself(e.target)) return;
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;               /* sideways swipes stay native */
       e.preventDefault();
@@ -47,13 +52,51 @@
     d.addEventListener('keydown', function () { running = false; });
     d.addEventListener('click', function (e) {
       var a = e.target.closest && e.target.closest('a[href^="#"]');
-      if (!a || a.getAttribute('href').length < 2) return;
+      if (!on || !a || a.getAttribute('href').length < 2) return;
       var el = d.getElementById(a.getAttribute('href').slice(1));
       if (!el) return;
       e.preventDefault();
       go(el.getBoundingClientRect().top + window.scrollY - 96);
       if (history.replaceState) history.replaceState(null, '', a.getAttribute('href'));
       el.setAttribute('tabindex', '-1'); el.focus({ preventScroll: true });
+    });
+    var wrap = d.querySelector('[data-inertia-wrap]'), tog = d.querySelector('[data-inertia-toggle]');
+    if (wrap && tog) {
+      var label = tog.querySelector('[data-inertia-state]'), words = [d.body.getAttribute('data-inertia-on') || 'on', d.body.getAttribute('data-inertia-off') || 'off'];
+      var paint = function () { tog.setAttribute('aria-pressed', on ? 'true' : 'false'); if (label) label.textContent = on ? words[0] : words[1]; };
+      wrap.hidden = false; paint();
+      tog.addEventListener('click', function () { on = !on; running = false; target = cur = window.scrollY; store(on ? 'on' : 'off'); paint(); });
+    }
+  }
+
+  /* ---------- 1b. rows that open and close smoothly ----------
+     <details> snaps by default. Here the height is animated both ways; the element stays a real <details>, so
+     find-in-page, keyboard and no-JS behaviour are untouched. */
+  if (Element.prototype.animate) {
+    Array.prototype.forEach.call(d.querySelectorAll('.faq details'), function (det) {
+      var sum = det.querySelector('summary'), anim = null;
+      if (!sum) return;
+      sum.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (anim) anim.cancel();
+        var from = det.offsetHeight, opening = !det.open;
+        if (opening) det.open = true;
+        var to = opening ? det.offsetHeight : sum.offsetHeight + (det.offsetHeight - det.clientHeight);
+        det.style.overflow = 'hidden';
+        if (!opening) det.classList.add('is-closing');
+        anim = det.animate({ height: [from + 'px', to + 'px'] }, { duration: opening ? 360 : 280, easing: 'cubic-bezier(.4,0,.6,1)' });
+        anim.onfinish = anim.oncancel = function () { if (!opening) det.open = false; det.classList.remove('is-closing'); det.style.overflow = ''; anim = null; };
+      });
+    });
+    /* the quote sheet leaves as gracefully as it arrives */
+    Array.prototype.forEach.call(d.querySelectorAll('dialog.sheet'), function (dlg) {
+      var nativeClose = dlg.close.bind(dlg), leaving = false;
+      dlg.close = function (v) {
+        if (leaving || !dlg.open) return;
+        leaving = true; dlg.classList.add('is-closing');
+        setTimeout(function () { dlg.classList.remove('is-closing'); leaving = false; nativeClose(v); }, 210);
+      };
+      dlg.addEventListener('cancel', function (e) { e.preventDefault(); dlg.close(); });
     });
   }
 
