@@ -1,5 +1,5 @@
-/* Chauffeur service site. No dependencies. Everything degrades: without JS the forms post as mailto and
-   every price is already in the HTML. */
+/* Chauffeur service site. No dependencies. Without JS every price is already in the HTML and the forms show
+   mail and phone instead of a send button. */
 (function () {
   'use strict';
   var d = document, body = d.body;
