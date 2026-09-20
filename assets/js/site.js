@@ -2,46 +2,57 @@
    mail and phone instead of a send button. */
 (function () {
   'use strict';
-  var d = document, body = d.body;
+  var d = document, body = d.body, root = d.documentElement;
   var $ = function (s, r) { return (r || d).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || d).querySelectorAll(s)); };
   var PRICES = {};
   try { PRICES = JSON.parse($('#price-data').textContent); } catch (e) {}
-  var T0 = Date.now();
+  var L = PRICES.labels || {};
+  var ROUTES = PRICES.routes || {};
 
-  /* ---------- consent (basic mode: no Google script before Accept) ---------- */
-  var GA4 = body.getAttribute('data-ga4'), ADS = body.getAttribute('data-ads');
+  /* ---------- consent (basic mode: no Google script before Accept) ----------
+     The banner asks for analytics only, so only analytics_storage is ever granted. Advertising storage stays
+     denied until the site gets a separate, separately worded advertising choice. */
+  var GA4 = body.getAttribute('data-ga4');
   var KEY = 'consent.v1';
   var banner = $('[data-consent]');
+  var DENIED = { ad_storage: 'denied', analytics_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' };
   window.dataLayer = window.dataLayer || [];
   function gtag() { window.dataLayer.push(arguments); }
-  var loaded = false;
+  var loaded = false, granted = false;
   function loadGoogle() {
-    if (loaded || (!GA4 && !ADS)) return;
+    if (!GA4) return;
+    granted = true;
+    if (loaded) { gtag('consent', 'update', { analytics_storage: 'granted' }); return; }
     loaded = true;
-    gtag('consent', 'default', { ad_storage: 'denied', analytics_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
-    gtag('consent', 'update', { ad_storage: 'granted', analytics_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted' });
+    gtag('consent', 'default', DENIED);
+    gtag('consent', 'update', { analytics_storage: 'granted' });
     var s = d.createElement('script'); s.async = true;
-    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA4 || ADS);
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA4);
     d.head.appendChild(s);
     gtag('js', new Date());
-    if (GA4) gtag('config', GA4);
-    if (ADS) gtag('config', ADS);
+    gtag('config', GA4);
   }
   function getConsent() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
-  function setConsent(v) { try { localStorage.setItem(KEY, v); } catch (e) {} if (banner) banner.hidden = true; if (v === 'granted') loadGoogle(); }
+  function setConsent(v) {
+    try { localStorage.setItem(KEY, v); } catch (e) {}
+    if (banner) banner.hidden = true;
+    if (v === 'granted') loadGoogle();
+    else { granted = false; if (loaded) gtag('consent', 'update', DENIED); } /* revocation takes effect at once */
+  }
   if (banner) {
     var c = getConsent();
     if (c === 'granted') loadGoogle();
     /* The banner only matters when there is something to consent to. */
-    else if (!c && (GA4 || ADS)) banner.hidden = false;
+    else if (!c && GA4) banner.hidden = false;
     $('[data-consent-accept]').addEventListener('click', function () { setConsent('granted'); });
     $('[data-consent-reject]').addEventListener('click', function () { setConsent('denied'); });
     $$('[data-consent-open]').forEach(function (b) { b.addEventListener('click', function () { banner.hidden = false; $('[data-consent-accept]').focus(); }); });
   }
+  /* Events never carry form content: only the event name and the product key. */
   function track(name, params) {
     params = params || {}; params.product = params.product || body.getAttribute('data-page');
-    if (loaded) gtag('event', name, params);
+    if (loaded && granted) gtag('event', name, params);
     try { d.dispatchEvent(new CustomEvent('site:track', { detail: { name: name, params: params } })); } catch (e) {}
   }
   d.addEventListener('click', function (e) {
@@ -56,32 +67,46 @@
     onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
   }
   var burger = $('[data-burger]'), nav = $('#nav');
-  if (burger && nav) burger.addEventListener('click', function () {
-    var open = nav.classList.toggle('is-open'); burger.setAttribute('aria-expanded', open ? 'true' : 'false');
-  });
+  function setMenu(open, focusBack) {
+    if (!burger || !nav) return;
+    nav.classList.toggle('is-open', open);
+    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var label = $('.sr', burger); if (label) label.textContent = open ? burger.getAttribute('data-close') : burger.getAttribute('data-open');
+    if (!open && focusBack) burger.focus();
+  }
+  if (burger && nav) {
+    burger.addEventListener('click', function () { setMenu(!nav.classList.contains('is-open')); });
+    nav.addEventListener('click', function (e) { if (e.target.closest('a')) setMenu(false); });
+    d.addEventListener('keydown', function (e) { if (e.key === 'Escape' && nav.classList.contains('is-open')) setMenu(false, true); });
+    d.addEventListener('click', function (e) { if (nav.classList.contains('is-open') && !e.target.closest('[data-head]')) setMenu(false); });
+    window.addEventListener('resize', function () { if (nav.classList.contains('is-open') && getComputedStyle(burger).display === 'none') setMenu(false); });
+  }
 
-  /* ---------- prices ---------- */
+  /* ---------- prices ----------
+     A price is shown only when the owners stated one for exactly this product and class. The VIP rate is an
+     hourly rate: it is never shown for a fixed route, the airport or a tour. */
   function money(n) { return '€' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
-  /* Returns {text, note} for a product + class, or null when the owners have not set a price. */
-  function priceFor(product, cls, hours) {
-    var p = PRICES.products && PRICES.products[product];
-    if (!p) return null;
-    if (product === 'vip' || cls === 'vip') {
-      var rate = PRICES.products.vip.rate;
-      return { text: money(rate) + ' ' + PRICES.labels.per_hour, hourly: true };
+  function priceFor(product, cls) {
+    var all = PRICES.products || {};
+    if (cls === 'vip' || product === 'vip') {
+      if (product === 'hourly' || product === 'vip') return { text: money(all.vip.rate) + ' ' + L.per_hour, hourly: true };
+      return null;
     }
-    var v = p[cls];
-    if (v == null) return null;
-    if (p.unit === 'hour') {
-      var h = Math.max(parseInt(hours, 10) || p.min_hours, p.min_hours);
-      return { text: money(v) + ' ' + PRICES.labels.per_hour, total: money(v * h), hours: h, hourly: true };
-    }
-    return { text: money(v) };
+    var p = all[product];
+    if (!p || p[cls] == null) return null;
+    return p.unit === 'hour' ? { text: money(p[cls]) + ' ' + L.per_hour, hourly: true, min: p.min_hours } : { text: money(p[cls]) };
+  }
+  function matchRoute(text) {
+    text = (text || '').toLowerCase();
+    if (/vienna airport|schwechat|\bvie\b/.test(text)) return 'vienna_airport';
+    if (/vienna|wien|b[eé]cs/.test(text)) return 'vienna';
+    if (/prague|praha|pr[aá]ga/.test(text)) return 'prague';
+    if (/bratislava|pozsony/.test(text)) return 'bratislava';
+    return '';
   }
 
   /* ---------- quote forms ---------- */
   var sheet = $('[data-sheet]');
-  var waLinks = $$('[data-wa-link]');
   var waBase = 'https://wa.me/' + body.getAttribute('data-wa');
   function waText(service, date) {
     var tpl = body.getAttribute('data-wa-text');
@@ -89,69 +114,83 @@
     if (!date) tpl = tpl.replace(/\s+\S+\s+\{date\}/, '');
     return tpl.replace('{service}', service || '').replace('{date}', date || '').replace(/\s+/g, ' ').trim();
   }
-  function refreshWa(service, date) {
-    var href = waBase + '?text=' + encodeURIComponent(waText(service, date));
-    waLinks.forEach(function (a) { a.href = href; });
-  }
-  refreshWa($('[data-quote-form] input[name=service]:checked') ? $('[data-quote-form] input[name=service]:checked').value : '', '');
+  /* The page's WhatsApp links carry the page's own service and nothing a visitor typed. */
+  (function () {
+    var first = $('[data-quote-form] input[name=service]:checked');
+    var href = waBase + '?text=' + encodeURIComponent(waText(first ? first.value : '', ''));
+    $$('[data-wa-link]').forEach(function (a) { a.href = href; });
+  })();
 
   function productOf(form) {
     var r = $('input[name=service]:checked', form);
     var skey = r ? r.getAttribute('data-skey') : '';
-    var preset = form.getAttribute('data-product');
     if (skey === 'airport') return 'airport';
     if (skey === 'hourly') return 'hourly';
     if (skey === 'tour') return 'tours';
-    if (skey === 'city') return (preset && PRICES.routes && PRICES.routes[preset]) ? preset : matchRoute($('input[name=route]', form).value);
-    return preset;
-  }
-  function matchRoute(text) {
-    text = (text || '').toLowerCase();
-    if (/vienna airport|schwechat|vie\b/.test(text)) return 'vienna_airport';
-    if (/vienna|wien|b[eé]cs/.test(text)) return 'vienna';
-    if (/prague|praha|pr[aá]ga/.test(text)) return 'prague';
-    if (/bratislava|pozsony/.test(text)) return 'bratislava';
+    if (skey === 'city') {
+      /* What the visitor typed wins over the page preset, so a changed route never keeps the old price. */
+      var typed = $('input[name=route]', form).value;
+      var m = matchRoute(typed);
+      if (m) return m;
+      var preset = form.getAttribute('data-product');
+      return (!typed.trim() && ROUTES[preset]) ? preset : '';
+    }
     return '';
   }
   function updateSum(form) {
     var box = $('[data-price-sum]', form); if (!box) return;
-    var cls = $('select[name=vehicle_class]', form).value;
     var product = productOf(form);
-    var pr = product ? priceFor(product, cls) : null;
+    var pr = product ? priceFor(product, $('select[name=vehicle_class]', form).value) : null;
     if (!pr) { box.hidden = true; return; }
     $('[data-price-out]', box).textContent = pr.text;
+    $('[data-price-note]', box).textContent = L.price_note + (pr.min ? ' ' + L.min_hours.replace('{n}', pr.min) : '');
     box.hidden = false;
   }
-  $$('[data-quote-form]').forEach(function (form) {
+  function setDateMin(form) {
+    var t = new Date(); t.setMinutes(t.getMinutes() - t.getTimezoneOffset());
+    $('input[name=date]', form).min = t.toISOString().slice(0, 10);
+  }
+  function newId() {
+    try { return crypto.randomUUID(); } catch (e) { return String(Date.now()) + Math.random().toString(16).slice(2); }
+  }
+  var forms = $$('[data-quote-form]');
+  forms.forEach(function (form) {
+    form._shown = performance.now();
+    var checked = $('input[name=service]:checked', form);
+    form._defaults = { product: form.getAttribute('data-product'), cls: $('select[name=vehicle_class]', form).value,
+      skey: checked ? checked.getAttribute('data-skey') : '' };
     $('input[name=page]', form).value = location.pathname;
-    $('input[name=t0]', form).value = String(T0);
-    var date = $('input[name=date]', form);
-    var today = new Date(); today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
-    date.min = today.toISOString().slice(0, 10);
+    $('input[name=request_id]', form).value = newId();
+    setDateMin(form);
+    /* No endpoint configured: the form is a WhatsApp handoff and says so. Contact details are not asked for,
+       because WhatsApp identifies the sender and nothing personal should travel in a URL. */
+    if (!form.getAttribute('data-endpoint')) {
+      form.setAttribute('data-mode', 'whatsapp');
+      $$('[data-contact-field]', form).forEach(function (f) { f.hidden = true; $$('input', f).forEach(function (i) { i.required = false; i.disabled = true; }); });
+      $('button[type=submit]', form).textContent = L.whatsapp_action;
+      var fine = $('[data-fine]', form); if (fine) fine.textContent = L.handoff_note;
+    }
     form.addEventListener('input', function () { updateSum(form); });
-    form.addEventListener('change', function () {
-      updateSum(form);
-      var r = $('input[name=service]:checked', form);
-      refreshWa(r ? r.value : '', date.value);
-    });
+    form.addEventListener('change', function () { updateSum(form); });
     updateSum(form);
     form.addEventListener('submit', function (e) { submit(e, form); });
   });
 
   function openQuote(btn) {
     if (!sheet || !sheet.showModal) { location.hash = '#quote'; return; }
-    var form = $('[data-quote-form]', sheet);
-    if (btn) {
-      var cls = btn.getAttribute('data-class'), product = btn.getAttribute('data-product'), route = btn.getAttribute('data-route');
-      if (cls) $('select[name=vehicle_class]', form).value = cls;
-      if (product) {
-        form.setAttribute('data-product', product);
-        var skey = product === 'airport' ? 'airport' : product === 'hourly' || product === 'vip' ? 'hourly' : product === 'tours' ? 'tour' : 'city';
-        var radio = $('input[data-skey="' + skey + '"]', form); if (radio) radio.checked = true;
-      }
-      if (route) $('input[name=route]', form).value = route;
-      var dt = btn.getAttribute('data-date'); if (dt) $('input[name=date]', form).value = dt;
-    }
+    var form = $('[data-quote-form]', sheet), def = form._defaults;
+    /* Start from the page defaults every time, so nothing from an earlier trigger leaks into this one.
+       Text the visitor typed into the route field is kept unless this trigger names a route. */
+    var cls = (btn && btn.getAttribute('data-class')) || def.cls;
+    var product = (btn && btn.getAttribute('data-product')) || def.product;
+    var route = btn && btn.getAttribute('data-route');
+    var skey = product === 'airport' ? 'airport' : (product === 'hourly' || product === 'vip') ? 'hourly' : product === 'tours' ? 'tour' : ROUTES[product] ? 'city' : def.skey;
+    form.setAttribute('data-product', product);
+    $('select[name=vehicle_class]', form).value = cls;
+    var radio = $('input[data-skey="' + skey + '"]', form); if (radio) radio.checked = true;
+    if (route) $('input[name=route]', form).value = route;
+    var dt = btn && btn.getAttribute('data-date'); if (dt) $('input[name=date]', form).value = dt;
+    form._shown = performance.now();
     updateSum(form);
     sheet.showModal();
     track('quote_open');
@@ -165,50 +204,79 @@
   });
 
   function setErr(input, msg) {
-    input.setAttribute('aria-invalid', 'true');
-    var holder = input.closest('.field') || input.closest('fieldset');
-    if (holder && !$('.err', holder)) { var s = d.createElement('span'); s.className = 'err'; s.textContent = msg; holder.appendChild(s); }
+    var group = input.type === 'radio' ? input.closest('fieldset') : null;
+    var target = group || input, holder = group || input.closest('.field');
+    target.setAttribute('aria-invalid', 'true');
+    if (holder && !$('.err', holder)) {
+      var s = d.createElement('span'); s.className = 'err'; s.textContent = msg; s.id = (input.id || input.name) + '-err';
+      holder.appendChild(s); target.setAttribute('aria-describedby', s.id);
+    }
   }
-  function clearErr(form) { $$('[aria-invalid]', form).forEach(function (i) { i.removeAttribute('aria-invalid'); }); $$('.err', form).forEach(function (n) { n.remove(); }); }
+  function clearErr(form) {
+    $$('[aria-invalid]', form).forEach(function (i) { i.removeAttribute('aria-invalid'); i.removeAttribute('aria-describedby'); });
+    $$('.err', form).forEach(function (n) { n.remove(); });
+  }
+  function say(form, text, state) {
+    var status = $('[data-form-status]', form);
+    if (state) status.setAttribute('data-state', state); else status.removeAttribute('data-state');
+    status.textContent = text;
+  }
 
   function submit(e, form) {
-    var status = $('[data-form-status]', form), L = PRICES.labels || {};
+    e.preventDefault();
     clearErr(form);
     var bad = $$('input,select,textarea', form).filter(function (i) { return i.willValidate && !i.checkValidity(); });
     if (bad.length) {
-      e.preventDefault();
       bad.forEach(function (i) { setErr(i, i.validity.valueMissing ? L.required : L.invalid); });
-      bad[0].focus(); status.setAttribute('data-state', 'error'); status.textContent = L.fix; return;
+      bad[0].focus(); say(form, L.fix, 'error'); return;
     }
-    /* Spam traps: a filled honeypot or a submit faster than a human. Pretend success, send nothing. */
-    var trapped = $('input[name=website]', form).value || (Date.now() - T0 < 3000);
-    var endpoint = form.getAttribute('data-endpoint');
+    /* Spam signals: the hidden field, and a send within 1.5 s of the form becoming visible. A trapped send is
+       told to try again. It is never shown a success it did not have. */
+    if ($('input[name=website]', form).value || performance.now() - form._shown < 1500) { say(form, L.retry, 'error'); return; }
+    var btn = $('button[type=submit]', form);
+    if (btn.disabled) return;
     var data = new FormData(form);
-    var product = productOf(form), cls = data.get('vehicle_class');
-    var pr = product ? priceFor(product, cls) : null;
+    var product = productOf(form), pr = product ? priceFor(product, data.get('vehicle_class')) : null;
     data.set('quoted_price', pr ? pr.text : 'on request');
     data.set('product', product || '');
-    if (!endpoint) {
-      /* No endpoint configured yet: hand the request to WhatsApp, which needs no server. */
-      e.preventDefault();
-      if (trapped) return;
+    data.set('elapsed_ms', String(Math.round(performance.now() - form._shown)));
+    data.delete('website');
+
+    if (form.getAttribute('data-mode') === 'whatsapp') {
+      /* Journey details only. The visitor reviews and sends the message in WhatsApp: that is the contact,
+         so this counts as a WhatsApp click, not as a lead. */
       var lines = [waText(data.get('service'), data.get('date'))];
-      ['route', 'time', 'vehicle_class', 'passengers', 'luggage', 'name', 'email', 'phone', 'note'].forEach(function (k) {
-        if (data.get(k)) lines.push(k.replace('_', ' ') + ': ' + data.get(k));
+      [['route', L.f_route], ['time', L.f_time], ['vehicle_class', L.f_class], ['passengers', L.f_pax], ['luggage', L.f_bags], ['flight_number', L.f_flight], ['note', L.f_note]].forEach(function (k) {
+        if (data.get(k[0])) lines.push(k[1] + ': ' + data.get(k[0]));
       });
-      track('generate_lead', { method: 'whatsapp_fallback', product: product });
-      window.open(waBase + '?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener');
-      status.removeAttribute('data-state'); status.textContent = L.sent_whatsapp; return;
+      btn.disabled = true;
+      var w = window.open(waBase + '?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener');
+      setTimeout(function () { btn.disabled = false; }, 2500);
+      /* With noopener the return value is null in most browsers even on success, so say what to do either way. */
+      track('whatsapp_click', { method: 'form_handoff', product: product });
+      say(form, L.sent_whatsapp); void w; return;
     }
-    e.preventDefault();
-    var btn = $('button[type=submit]', form); btn.disabled = true; status.removeAttribute('data-state'); status.textContent = L.sending;
-    if (trapped) { setTimeout(function () { location.href = PRICES.thanks_url; }, 600); return; }
+
+    btn.disabled = true; say(form, L.sending);
     /* Form-encoded keeps this a simple request: Apps Script has no OPTIONS handler. */
-    fetch(endpoint, { method: 'POST', body: new URLSearchParams(data), redirect: 'follow' })
-      .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.text(); })
-      .then(function () { track('generate_lead', { method: 'form', product: product }); location.href = PRICES.thanks_url; })
-      .catch(function () { btn.disabled = false; status.setAttribute('data-state', 'error'); status.textContent = L.error; });
+    fetch(form.getAttribute('data-endpoint'), { method: 'POST', body: new URLSearchParams(data), redirect: 'follow' })
+      .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then(function (res) {
+        if (!res || res.ok !== true) throw new Error('rejected');
+        track('generate_lead', { method: 'form', product: product });
+        location.href = PRICES.thanks_url;
+      })
+      /* The backend dedups on request_id, so pressing send again after an unreadable response is safe. */
+      .catch(function () { btn.disabled = false; say(form, L.error, 'error'); });
   }
+  /* Back from the thank-you page out of bfcache: the form must be usable again. */
+  window.addEventListener('pageshow', function (ev) {
+    if (!ev.persisted) return;
+    forms.forEach(function (form) {
+      $('button[type=submit]', form).disabled = false; say(form, '');
+      $('input[name=request_id]', form).value = newId(); setDateMin(form); form._shown = performance.now();
+    });
+  });
 
   /* ---------- quick quote bar (home) ---------- */
   var quick = $('[data-quick]');
@@ -218,18 +286,16 @@
     qd.min = $('[data-quote-form] input[name=date]').min;
     var sync = function () {
       var svc = qs.value;
-      $$('option', qr).forEach(function (o) { o.hidden = o.getAttribute('data-for') !== svc; });
-      if (qr.selectedOptions[0] && qr.selectedOptions[0].hidden) { var f = $$('option', qr).filter(function (o) { return !o.hidden; })[0]; if (f) qr.value = f.value; }
-      var product = qr.value, cls = qc.value;
-      var pr = priceFor(product, cls);
-      out.innerHTML = '';
+      $$('option', qr).forEach(function (o) { var off = o.getAttribute('data-for') !== svc; o.hidden = off; o.disabled = off; });
+      if (qr.selectedOptions[0] && qr.selectedOptions[0].disabled) { var f = $$('option', qr).filter(function (o) { return !o.disabled; })[0]; if (f) qr.value = f.value; }
+      var product = qr.value, cls = qc.value, pr = priceFor(product, cls);
+      while (out.firstChild) out.removeChild(out.firstChild);
       var strong = d.createElement('strong'); strong.className = 'num';
-      strong.textContent = pr ? pr.text : PRICES.labels.on_request; out.appendChild(strong);
+      strong.textContent = pr ? pr.text : L.on_request; out.appendChild(strong);
       var span = d.createElement('span');
-      var min = PRICES.products[product] && PRICES.products[product].min_hours;
-      span.textContent = pr ? (PRICES.labels.price_note + (pr.hourly && min ? ' ' + PRICES.labels.min_hours.replace('{n}', min) : '')) : PRICES.labels.on_request_note;
+      span.textContent = pr ? (L.price_note + (pr.min ? ' ' + L.min_hours.replace('{n}', pr.min) : '')) : L.on_request_note;
       out.appendChild(span);
-      if (cls === 's') { var n = d.createElement('span'); n.className = 'chip'; n.textContent = PRICES.labels.s_note; out.appendChild(n); }
+      if (cls === 's') { var n = d.createElement('span'); n.className = 'chip'; n.textContent = L.s_note; out.appendChild(n); }
       go.setAttribute('data-product', product); go.setAttribute('data-class', cls);
       go.setAttribute('data-route', qr.selectedOptions[0] ? qr.selectedOptions[0].textContent : '');
       go.setAttribute('data-date', qd.value);
@@ -238,10 +304,12 @@
     sync();
   }
 
-  /* ---------- reveal ---------- */
+  /* ---------- reveal ----------
+     Content is visible by default. It is only hidden for the entrance once the observer certainly exists. */
   var items = $$('.reveal');
   if ('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     var io = new IntersectionObserver(function (es) { es.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('is-in'); io.unobserve(en.target); } }); }, { rootMargin: '0px 0px -8% 0px' });
+    root.classList.add('motion-ready');
     items.forEach(function (n) { io.observe(n); });
-  } else items.forEach(function (n) { n.classList.add('is-in'); });
+  }
 })();
