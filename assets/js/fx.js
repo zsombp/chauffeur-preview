@@ -1,7 +1,9 @@
 /* Optional flourishes, kept apart from site.js so the core never depends on them.
-   1. Weighted inertia scrolling (mouse and trackpad only).
-   2. The "pit": promise pills that drop, settle and can be thrown around (matter.js, loaded on demand).
-   Both stay off for reduced motion. Touch scrolling is never touched. */
+   1. Weighted inertia scrolling (mouse and trackpad only). OFF unless the visitor switches it on in the footer.
+   1b. FAQ rows and the quote sheet open and close smoothly.
+   2. The pills: rows of promises that lean away from the pointer and spring back (no library).
+   3. A soft light that follows the pointer across tiles.
+   All of it stays off for reduced motion. Touch scrolling is never touched. */
 (function () {
   'use strict';
   var d = document, root = d.documentElement;
@@ -12,12 +14,12 @@
   /* ---------- 1. inertia scrolling ----------
      The wheel sets a target; the page eases towards it, so a flick carries on and settles like something with
      mass. Native scrolling stays in charge of everything else: touch, keyboard, scrollbar drag, find-in-page.
-     Easing is measured in time, so it feels the same at 60 and 120 Hz. It can be switched off: the footer has
-     a toggle (remembered in this browser) and ?inertia=off in the address does the same. */
+     Easing is measured in time, so it feels the same at 60 and 120 Hz. Off by default: the footer has a toggle
+     (remembered in this browser) and ?inertia=on in the address does the same. */
   if (fine) {
     var store = function (v) { try { if (v === undefined) return localStorage.getItem('inertia'); localStorage.setItem('inertia', v); } catch (e) { return null; } };
     var q = /[?&]inertia=(on|off)/.exec(location.search); if (q) store(q[1]);
-    var on = store() !== 'off';
+    var on = store() === 'on';   /* native scrolling is the default (Zsomb, 2026-09-20): every premium reference ships it */
     var target = window.scrollY, cur = target, running = false, last = 0, frame = 0;
     var TAU = 115;                 /* ms; higher = heavier */
     var limit = function () { return Math.max(0, root.scrollHeight - window.innerHeight); };
@@ -110,71 +112,52 @@
     });
   }
 
-  /* ---------- 2. the pit ----------
-     The pills are a normal list in the HTML. The physics only takes over their position; the text stays real
-     text. matter.js (MIT, self-hosted) is fetched when the pit comes near, never on first load. */
+  /* ---------- 2. the pills ----------
+     A normal list, laid out in rows by CSS. With a mouse, each pill is a small mass on a spring: the pointer
+     pushes the near ones aside, they overshoot a little and settle back. Nothing runs unless the pointer is
+     over the block or something is still moving. */
   var pit = d.querySelector('[data-pit]');
-  if (!pit || !('IntersectionObserver' in window)) return;
-  var started = false;
-  var near = new IntersectionObserver(function (es) {
-    if (!es[0].isIntersecting || started) return;
-    started = true; near.disconnect();
-    var s = d.createElement('script'); s.src = pit.getAttribute('data-matter'); s.async = true;
-    s.onload = boot; d.head.appendChild(s);
-  }, { rootMargin: '60% 0px' });
-  near.observe(pit);
-
-  function boot() {
-    var M = window.Matter; if (!M) return;
-    var stage = pit.querySelector('[data-pit-stage]'), pills = Array.prototype.slice.call(stage.querySelectorAll('li'));
-    var sizes = pills.map(function (p) { var r = p.getBoundingClientRect(); return { w: r.width, h: r.height }; });
-    var engine = M.Engine.create({ enableSleeping: true });
-    engine.gravity.y = 1.05;
-    var W, H, walls = [], bodies = [], visible = false, dropped = false, raf = 0;
-
-    function buildWalls() {
-      walls.forEach(function (w) { M.Composite.remove(engine.world, w); });
-      W = stage.clientWidth; H = stage.clientHeight;
-      var t = 200, o = { isStatic: true, friction: 0.6 };
-      walls = [M.Bodies.rectangle(W / 2, H + t / 2, W + 2 * t, t, o), M.Bodies.rectangle(-t / 2, H / 2 - 600, t, H + 1600, o), M.Bodies.rectangle(W + t / 2, H / 2 - 600, t, H + 1600, o)];
-      M.Composite.add(engine.world, walls);
-    }
-    function drop() {
-      /* go live first, then measure: the stage only has its tall shape once it is live */
-      dropped = true; pit.classList.add('is-live'); buildWalls();
-      pills.forEach(function (p, i) {
-        var s = sizes[i];
-        var b = M.Bodies.rectangle(W * (0.15 + 0.7 * ((i * 0.37) % 1)), -80 - i * 95, s.w, s.h,
-          { chamfer: { radius: s.h / 2 - 1 }, restitution: 0.32, friction: 0.45, frictionAir: 0.012, density: 0.0016, angle: (i % 2 ? 1 : -1) * (0.15 + (i * 0.07) % 0.4) });
-        b._el = p; b._w = s.w; b._h = s.h; bodies.push(b);
-      });
-      M.Composite.add(engine.world, bodies);
-      if (fine) {
-        var mouse = M.Mouse.create(stage);
-        /* matter.js swallows the wheel over its element by default: give the page its scroll back */
-        ['wheel', 'mousewheel', 'DOMMouseScroll'].forEach(function (ev) { mouse.element.removeEventListener(ev, mouse.mousewheel); });
-        M.Composite.add(engine.world, M.MouseConstraint.create(engine, { mouse: mouse, constraint: { stiffness: 0.16, damping: 0.2, render: { visible: false } } }));
+  if (pit && fine) {
+    var stage = pit.querySelector('[data-pit-stage]');
+    var pills = Array.prototype.map.call(stage.querySelectorAll('li'), function (el) { return { el: el, x: 0, y: 0, vx: 0, vy: 0, cx: 0, cy: 0 }; });
+    var px = -9999, py = -9999, praf = 0, plast = 0, inside = false;
+    var R = 170, PUSH = 2600, K = 95, DAMP = 11;   /* reach (px), push, spring stiffness, damping */
+    var measure = function () {
+      var sr = stage.getBoundingClientRect();
+      pills.forEach(function (p) { var r = p.el.getBoundingClientRect(); p.cx = r.left - sr.left + r.width / 2 - p.x; p.cy = r.top - sr.top + r.height / 2 - p.y; });
+    };
+    var tick = function (now) {
+      var dt = Math.min(0.032, (now - (plast || now - 16)) / 1000); plast = now;
+      var moving = false;
+      for (var i = 0; i < pills.length; i++) {
+        var p = pills[i], dx = p.cx + p.x - px, dy = p.cy + p.y - py, dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        var fx2 = -K * p.x - DAMP * p.vx, fy2 = -K * p.y - DAMP * p.vy;
+        if (inside && dist < R) { var f = PUSH * (1 - dist / R) * (1 - dist / R); fx2 += f * dx / dist; fy2 += f * dy / dist; }
+        p.vx += fx2 * dt; p.vy += fy2 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+        if (Math.abs(p.x) + Math.abs(p.y) + Math.abs(p.vx) + Math.abs(p.vy) > 0.05) moving = true; else { p.x = p.y = p.vx = p.vy = 0; }
+        p.el.style.transform = 'translate3d(' + p.x.toFixed(2) + 'px,' + p.y.toFixed(2) + 'px,0) rotate(' + (p.vx * 0.012).toFixed(3) + 'deg)';
       }
-    }
-    function frame() {
-      raf = 0;
-      if (!visible) return;
-      M.Engine.update(engine, 1000 / 60);
-      for (var i = 0; i < bodies.length; i++) {
-        var b = bodies[i];
-        if (b.position.y > H + 400) M.Body.setPosition(b, { x: W / 2, y: -100 }), M.Body.setVelocity(b, { x: 0, y: 0 });
-        b._el.style.transform = 'translate(' + (b.position.x - b._w / 2).toFixed(1) + 'px,' + (b.position.y - b._h / 2).toFixed(1) + 'px) rotate(' + b.angle.toFixed(3) + 'rad)';
-      }
-      raf = requestAnimationFrame(frame);
-    }
-    buildWalls();
-    new IntersectionObserver(function (es) {
-      visible = es[0].isIntersecting;
-      if (visible && !dropped && es[0].intersectionRatio > 0.25) drop();
-      if (visible && dropped && !raf) raf = requestAnimationFrame(frame);
-    }, { threshold: [0, 0.25, 0.6] }).observe(pit);
-    var rt; window.addEventListener('resize', function () {
-      clearTimeout(rt); rt = setTimeout(function () { buildWalls(); bodies.forEach(function (b) { M.Sleeping.set(b, false); if (b.position.x > W - 20) M.Body.setPosition(b, { x: W / 2, y: b.position.y }); }); }, 200);
-    });
+      praf = (moving || inside) ? requestAnimationFrame(tick) : 0;
+      if (!praf) plast = 0;
+    };
+    var wake = function () { if (!praf) { plast = 0; praf = requestAnimationFrame(tick); } };
+    stage.addEventListener('pointerenter', function () { measure(); inside = true; wake(); });
+    stage.addEventListener('pointermove', function (e) { var sr = stage.getBoundingClientRect(); px = e.clientX - sr.left; py = e.clientY - sr.top; inside = true; wake(); });
+    stage.addEventListener('pointerleave', function () { inside = false; px = py = -9999; wake(); });
+    window.addEventListener('resize', function () { pills.forEach(function (p) { p.x = p.y = p.vx = p.vy = 0; p.el.style.transform = ''; }); });
+  }
+
+  /* ---------- 3. pointer light on tiles ----------
+     One listener for the page. The tile under the pointer gets two custom properties; CSS paints the glow. */
+  if (fine) {
+    var lit = null;
+    d.addEventListener('pointermove', function (e) {
+      var t = e.target.closest && e.target.closest('[data-lit], .card, .route, .vip, .quick__card, .today, .moment');
+      if (lit && lit !== t) { lit.classList.remove('is-lit'); lit = null; }
+      if (!t) return;
+      var r = t.getBoundingClientRect();
+      t.style.setProperty('--mx', (e.clientX - r.left).toFixed(0) + 'px'); t.style.setProperty('--my', (e.clientY - r.top).toFixed(0) + 'px');
+      if (lit !== t) { t.classList.add('is-lit'); lit = t; }
+    }, { passive: true });
   }
 })();

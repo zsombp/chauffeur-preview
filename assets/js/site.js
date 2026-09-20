@@ -308,84 +308,36 @@
     sync();
   }
 
-  /* ---------- scroll film ----------
-     A rendered image sequence scrubbed by scroll position on a pinned canvas. It only switches on when the
-     visitor has not asked for reduced motion or data saving; otherwise the poster and the captions stay as a
-     normal static block. What keeps it smooth: frames are decoded off the main thread into ImageBitmaps, the
-     loop runs every frame while the film is on screen (scroll events arrive unevenly), easing is measured in
-     time, not frames, and the two nearest frames are blended so a slow scroll has no visible steps. */
+  /* ---------- film ----------
+     A short rendered film that plays by itself when it comes into view, holds its last frame and can be played
+     again. It used to be scrubbed by the scroll position: a scrubbed image sequence only changes picture when
+     the page moves far enough, so slow scrolling looked like a low frame rate however it was smoothed. A video
+     plays at its own steady rate. Reduced motion and data saver keep the poster; the captions are a plain list. */
   var film = $('[data-film]');
   var conn = navigator.connection || {};
   if (film && 'IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches && !conn.saveData) {
-    var small = matchMedia('(max-width: 760px)').matches;
-    var count = parseInt(film.getAttribute(small ? 'data-count-m' : 'data-count'), 10);
-    var base = film.getAttribute('data-base') + (small ? 'm' : 'd') + '-';
-    var canvas = $('canvas', film), ctx = canvas.getContext('2d'), caps = $$('[data-cap]', film);
-    var frames = new Array(count), started = false, cur = 0, last = 0, onScreen = false, raf = 0, lastKey = '';
-    var top0 = 0, span = 1, vh = 0;
-    var measure = function () { var r = film.getBoundingClientRect(); top0 = r.top + window.scrollY; vh = window.innerHeight; span = Math.max(1, r.height - vh);
-      var cw = canvas.clientWidth, ch = canvas.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr); lastKey = ''; };
-    var nearest = function (i) { for (var d2 = 0; d2 < count; d2++) { if (frames[i - d2]) return i - d2; if (frames[i + d2]) return i + d2; } return -1; };
-    var put = function (img, alpha) {
-      var nw = img.width, nh = img.height, W2 = canvas.width, H2 = canvas.height;
-      ctx.globalAlpha = alpha;
-      if (W2 / H2 < 1.25) {
-        /* tall box (phones): the car must stay whole, so fit by width with a little zoom and let the studio
-           floor and wall run on above and below by stretching the frame's first and last rows */
-        var w3 = W2 * 1.28, h3 = w3 * nh / nw, x3 = (W2 - w3) / 2, y3 = (H2 - h3) / 2;
-        ctx.drawImage(img, 0, 0, nw, 2, 0, 0, W2, Math.ceil(y3) + 1);
-        ctx.drawImage(img, 0, nh - 2, nw, 2, 0, Math.floor(y3 + h3) - 1, W2, Math.ceil(H2 - y3 - h3) + 2);
-        ctx.drawImage(img, x3, y3, w3, h3);
-      } else {
-        var s2 = Math.max(W2 / nw, H2 / nh), w2 = nw * s2, h2 = nh * s2;
-        ctx.drawImage(img, (W2 - w2) / 2, (H2 - h2) / 2, w2, h2);
-      }
+    var vid = $('video', film), caps = $$('[data-cap]', film), again = $('[data-film-toggle]', film);
+    var src = film.getAttribute(matchMedia('(max-width: 760px)').matches ? 'data-src-m' : 'data-src');
+    var armed = false, ended = false, giveUp = 0, inView = false;
+    var go = function () { if (armed && inView && !ended && vid.readyState >= 2) { var pr = vid.play(); if (pr && pr.catch) pr.catch(function () {}); } };
+    var showCaps = function () {
+      var p = vid.duration ? vid.currentTime / vid.duration : 0;
+      caps.forEach(function (c2, k) { var lo = k / caps.length, hi = (k + 1) / caps.length; c2.classList.toggle('is-on', ended ? k === caps.length - 1 : (p >= lo + 0.03 && p < hi)); });
     };
-    var loop = function (now) {
-      raf = 0;
-      if (!onScreen) return;
-      var dt = Math.min(64, now - (last || now)); last = now;
-      var rr = film.getBoundingClientRect();   /* one read per frame, before any write: cheap, and never stale */
-      var target = Math.min(1, Math.max(0, -rr.top / Math.max(1, rr.height - window.innerHeight)));
-      cur += (target - cur) * (1 - Math.exp(-dt / 90));
-      if (Math.abs(target - cur) < 0.0004) cur = target;
-      var f = cur * (count - 1), i = Math.floor(f), mix = f - i;
-      var a = nearest(i), b2 = i + 1 < count && frames[i + 1] ? i + 1 : -1;
-      if (a !== i) { b2 = -1; mix = 0; }
-      if (mix < 0.04) b2 = -1;
-      var key = a + ':' + b2 + ':' + (b2 < 0 ? 0 : Math.round(mix * 24));
-      if (a >= 0 && key !== lastKey) {
-        put(frames[a], 1);
-        if (b2 >= 0) put(frames[b2], mix);
-        ctx.globalAlpha = 1; lastKey = key; canvas.classList.add('is-ready');
-      }
-      var p = cur;
-      caps.forEach(function (c2, k) { var lo = k / caps.length, hi = (k + 1) / caps.length; c2.classList.toggle('is-on', p >= lo + 0.04 && p < hi - 0.02 || (k === caps.length - 1 && p >= lo + 0.04)); });
-      film.style.setProperty('--film-p', p.toFixed(4));
-      raf = requestAnimationFrame(loop);
+    var arm = function () {
+      if (armed) return; armed = true;
+      vid.src = src; vid.load();
+      giveUp = setTimeout(function () { if (vid.readyState < 2) { vid.removeAttribute('src'); vid.load(); film.classList.remove('is-live'); } }, 8000);
+      vid.addEventListener('loadeddata', function () { clearTimeout(giveUp); film.classList.add('is-live'); go(); }, { once: true });
+      vid.addEventListener('timeupdate', showCaps);
+      vid.addEventListener('ended', function () { ended = true; showCaps(); if (again) again.hidden = false; });
+      if (again) again.addEventListener('click', function () { ended = false; again.hidden = true; vid.currentTime = 0; vid.play(); });
     };
-    var kick = function () { if (!raf && onScreen) { last = 0; raf = requestAnimationFrame(loop); } };
-    var load = function (i) {
-      var url = base + ('00' + i).slice(-3) + '.webp';
-      var done = function (bmp) { frames[i] = bmp; lastKey = ''; };
-      if (window.createImageBitmap && window.fetch) {
-        fetch(url).then(function (r) { return r.blob(); }).then(function (bl) { return createImageBitmap(bl); }).then(done).catch(function () {});
-      } else { var im = new Image(); im.decoding = 'async'; im.onload = function () { done(im); }; im.src = url; }
-    };
-    var start = function () {
-      if (started) return; started = true;
-      film.classList.add('is-live'); measure();
-      var order = [], i2;
-      for (i2 = 0; i2 < count; i2 += 4) order.push(i2);
-      for (i2 = 0; i2 < count; i2++) if (i2 % 4) order.push(i2);
-      order.forEach(function (n, k) { setTimeout(function () { load(n); }, k * 10); });
-      window.addEventListener('resize', measure);
-      new IntersectionObserver(function (es) { onScreen = es[0].isIntersecting; if (onScreen) { measure(); kick(); } }, { rootMargin: '20% 0px' }).observe(film);
-    };
-    /* start when the film is within two screens, and never before the page has settled */
-    var fio = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { fio.disconnect(); if (window.requestIdleCallback) requestIdleCallback(start, { timeout: 1500 }); else setTimeout(start, 1); } }, { rootMargin: '200% 0px' });
-    fio.observe(film);
+    new IntersectionObserver(function (es) { if (es[0].isIntersecting) arm(); }, { rootMargin: '150% 0px' }).observe(film);
+    new IntersectionObserver(function (es) {
+      inView = es[0].intersectionRatio >= 0.5;
+      if (inView) go(); else if (!vid.paused) vid.pause();
+    }, { threshold: [0, 0.5, 1] }).observe(film);
   }
 
   /* ---------- reveal ----------
