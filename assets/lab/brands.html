@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Brand lab: seven identities for the chauffeur service</title>
+<style>
+/* Brand lab. Proposals only: no name here is registered, checked for trademarks or approved by anyone.
+   Fonts are SIL OFL (Fontsource): Inter and Fraunces from the site, plus Space Grotesk, Cormorant Garamond,
+   Manrope, Syncopate and JetBrains Mono for the lab. */
+@font-face { font-family: "Inter"; font-weight: 100 900; font-display: swap; src: url("../fonts/inter-latin-wght-normal.woff2") format("woff2"); }
+@font-face { font-family: "Fraunces"; font-weight: 100 900; font-display: swap; src: url("../fonts/fraunces-latin-wght-normal.woff2") format("woff2"); }
+@font-face { font-family: "Fraunces"; font-weight: 100 900; font-display: swap; src: url("../fonts/fraunces-latin-ext-wght-normal.woff2") format("woff2"); unicode-range: U+0100-02AF, U+1E00-1EFF; }
+@font-face { font-family: "Space Grotesk"; font-weight: 300 700; font-display: swap; src: url("fonts/space-grotesk.woff2") format("woff2"); }
+@font-face { font-family: "Cormorant"; font-weight: 500; font-display: swap; src: url("fonts/cormorant-500.woff2") format("woff2"); }
+@font-face { font-family: "Manrope"; font-weight: 200 800; font-display: swap; src: url("fonts/manrope.woff2") format("woff2"); }
+@font-face { font-family: "Syncopate"; font-weight: 400; font-display: swap; src: url("fonts/syncopate-400.woff2") format("woff2"); }
+@font-face { font-family: "Syncopate"; font-weight: 700; font-display: swap; src: url("fonts/syncopate-700.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 100 800; font-display: swap; src: url("fonts/jetbrains-mono.woff2") format("woff2"); }
+
+*, *::before, *::after { box-sizing: border-box; }
+html { background: #000; scroll-behavior: smooth; scroll-padding-top: 72px; }
+body { margin: 0; background: #000; color: #f5f5f7; font: 400 16px/1.5 "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; }
+.wrap { width: min(1240px, 100% - 40px); margin-inline: auto; }
+
+/* lab chrome */
+.lab-top { position: sticky; top: 0; z-index: 20; background: rgba(12, 12, 13, .86); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid #222; }
+.lab-top .wrap { display: flex; align-items: center; gap: 18px; min-height: 56px; overflow-x: auto; scrollbar-width: none; }
+.lab-top strong { font-weight: 600; white-space: nowrap; margin-right: 8px; }
+.lab-top a { text-decoration: none; color: #a1a1a6; font-size: .9rem; white-space: nowrap; padding: 6px 0; }
+.lab-top a:hover { color: #fff; }
+.lab-intro { padding: clamp(56px, 8vw, 112px) 0 clamp(24px, 4vw, 48px); }
+.lab-intro h1 { font-size: clamp(2.2rem, 5vw, 4rem); line-height: 1.05; letter-spacing: -.03em; margin: 0 0 18px; font-weight: 600; max-width: 18ch; }
+.lab-intro p { color: #a1a1a6; max-width: 68ch; margin: 0 0 10px; font-size: 1.06rem; }
+.overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 12px 0 clamp(48px, 7vw, 96px); }
+.overview a { display: grid; gap: 14px; align-content: space-between; min-height: 190px; padding: 22px; border-radius: 22px; text-decoration: none; background: var(--bg); color: var(--ink); border: 1px solid rgba(255, 255, 255, .08); transition: transform .3s cubic-bezier(.25, .1, .3, 1), border-color .3s; }
+.overview a:hover { transform: translateY(-3px); border-color: var(--accent); }
+.overview small { color: var(--muted); font-size: .86rem; line-height: 1.4; }
+@media (max-width: 900px) { .overview { grid-template-columns: repeat(2, minmax(0, 1fr)); } } @media (max-width: 560px) { .overview { grid-template-columns: 1fr; } }
+
+/* a brand */
+.brand { background: var(--bg); color: var(--ink); padding: clamp(56px, 8vw, 120px) 0; border-top: 1px solid rgba(255, 255, 255, .06); font-family: var(--body); }
+.brand__head { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: clamp(24px, 5vw, 72px); align-items: end; margin-bottom: clamp(32px, 5vw, 64px); }
+.brand__no { font: 500 .8rem/1 "JetBrains Mono", monospace; color: var(--accent); letter-spacing: .08em; margin: 0 0 18px; }
+.brand__name { font-family: var(--display); font-weight: var(--dw); letter-spacing: var(--dt); text-transform: var(--dcase); font-size: clamp(2.6rem, 6.5vw, 5.4rem); line-height: 1; margin: 0; }
+.brand__tag { margin: 18px 0 0; color: var(--muted); font-size: 1.15rem; }
+.brand__why p { margin: 0 0 12px; color: var(--muted); max-width: 56ch; }
+.brand__why p b { color: var(--ink); font-weight: 600; }
+.brand__meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.brand__meta span { font: 500 .78rem/1 "JetBrains Mono", monospace; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); color: var(--muted); }
+@media (max-width: 860px) { .brand__head { grid-template-columns: 1fr; } }
+
+.board { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+.tile { border-radius: 24px; background: var(--surface); padding: 24px; min-height: 200px; position: relative; overflow: hidden; border: 1px solid var(--line); }
+.tile h3 { position: absolute; left: 20px; top: 18px; margin: 0; font: 500 .72rem/1 "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); opacity: .8; }
+.tile--logo { grid-column: span 5; display: grid; place-items: center; min-height: 280px; }
+.tile--light { grid-column: span 4; display: grid; place-items: center; min-height: 280px; background: var(--paper); color: var(--paper-ink); border-color: transparent; }
+.tile--light h3 { color: var(--paper-ink); opacity: .55; }
+.tile--icon { grid-column: span 3; display: grid; place-items: center; }
+.tile--colors { grid-column: span 5; display: grid; align-content: end; gap: 0; padding: 0; }
+.tile--type { grid-column: span 4; display: grid; align-content: end; gap: 10px; padding-top: 48px; }
+.tile--sign { grid-column: span 3; display: grid; place-items: center; background: #1a1a1c; }
+@media (max-width: 900px) { .tile--logo, .tile--light, .tile--colors, .tile--type { grid-column: span 12; } .tile--icon, .tile--sign { grid-column: span 6; } }
+
+.logo { display: inline-flex; align-items: center; gap: .55em; color: inherit; font-size: 1.5rem; line-height: 1; white-space: nowrap; }
+.logo svg { width: 1.6em; height: 1.6em; flex: none; color: var(--mark, currentColor); }
+.logo__word { font-family: var(--display); font-weight: var(--lw); letter-spacing: var(--lt); text-transform: var(--lcase); }
+.logo__word i { font-style: normal; color: var(--accent); }
+.tile--light .logo__word i { color: var(--accent-dark); } .tile--light .logo svg { color: var(--accent-dark); }
+.logo--xl { font-size: clamp(1.5rem, 2.6vw, 2.2rem); }
+.tile--light .logo--xl { font-size: clamp(1.2rem, 1.9vw, 1.7rem); }
+.logo--stack { flex-direction: column; gap: .5em; text-align: center; } .logo--stack svg { width: 2.6em; height: 2.6em; }
+.logo__sub { display: block; margin-top: .55em; font: 500 .34em/1 var(--body); letter-spacing: .28em; text-transform: uppercase; color: var(--muted); }
+.tile--light .logo__sub { color: var(--paper-ink); opacity: .6; }
+.appicon { width: 116px; height: 116px; border-radius: 27px; display: grid; place-items: center; background: var(--icon-bg); color: var(--icon-ink); box-shadow: 0 20px 50px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .12); }
+.appicon svg { width: 62px; height: 62px; }
+.chips { display: grid; grid-template-columns: repeat(5, 1fr); height: 100%; min-height: 200px; }
+.chips div { display: grid; align-content: end; padding: 14px 12px; font: 500 .68rem/1.3 "JetBrains Mono", monospace; }
+.type-big { font-family: var(--display); font-weight: var(--dw); letter-spacing: var(--dt); text-transform: var(--dcase); font-size: 2.3rem; line-height: 1.05; margin: 0; }
+.type-body { margin: 0; color: var(--muted); font-size: .98rem; }
+.type-name { font: 500 .74rem/1.4 "JetBrains Mono", monospace; color: var(--muted); margin: 0; }
+.sign { width: 78%; aspect-ratio: 4 / 3; border-radius: 10px; background: #f5f5f4; color: #111; display: grid; place-items: center; text-align: center; padding: 10px; box-shadow: 0 24px 50px rgba(0, 0, 0, .6); transform: rotate(-2.5deg); }
+.sign b { display: block; font: 600 1.25rem/1.1 "Inter", sans-serif; letter-spacing: -.02em; }
+.sign .logo { font-size: .62rem; margin-top: 10px; color: #111; } .sign .logo svg, .sign .logo__word i { color: var(--accent-dark); }
+
+/* the website slice */
+.slice-label { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin: clamp(40px, 6vw, 80px) 0 14px; color: var(--muted); font: 500 .74rem/1 "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; }
+.slice { border-radius: 28px; overflow: hidden; border: 1px solid var(--line); background: var(--site-bg); }
+.s-head { display: flex; align-items: center; gap: 26px; padding: 16px clamp(18px, 3vw, 36px); background: var(--site-head); border-bottom: 1px solid var(--line); }
+.s-head .logo { font-size: 1.02rem; }
+.s-nav { display: flex; gap: 22px; margin-left: auto; font-size: .82rem; color: var(--muted); }
+.s-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 24px; border-radius: var(--btn-r); background: var(--accent); color: var(--on-accent); font: 500 .95rem/1 var(--body); text-decoration: none; border: 1px solid var(--accent); white-space: nowrap; }
+.s-btn--ghost { background: transparent; color: var(--ink); border-color: var(--line-strong); }
+.s-btn--sm { min-height: 38px; padding: 0 18px; font-size: .85rem; }
+.s-hero { text-align: center; padding: clamp(40px, 6vw, 88px) 20px 0; }
+.s-eyebrow { margin: 0 0 14px; color: var(--accent); font: var(--eyebrow); letter-spacing: var(--eyebrow-t); text-transform: var(--eyebrow-case); }
+.s-hero h2 { font-family: var(--display); font-weight: var(--dw); letter-spacing: var(--dt); text-transform: var(--dcase); font-size: clamp(2rem, 5.4vw, 4.4rem); line-height: 1.04; margin: 0 auto; max-width: 16ch; }
+.s-hero p { color: var(--muted); max-width: 40ch; margin: 18px auto 26px; font-size: 1.08rem; }
+.s-cta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.s-car { position: relative; margin-top: 8px; }
+.s-car img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; mix-blend-mode: var(--car-blend, normal); }
+.s-car::after { content: ""; position: absolute; inset: auto 0 0 0; height: 46%; background: radial-gradient(60% 70% at 50% 100%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%), linear-gradient(transparent 40%, var(--site-bg)); mix-blend-mode: normal; }
+.s-car::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 18%; background: linear-gradient(var(--site-bg), transparent); z-index: 1; }
+.s-quick { position: relative; z-index: 2; width: min(920px, 100% - 32px); margin: clamp(-90px, -7vw, -30px) auto 0; padding: 18px 20px; border-radius: var(--card-r); background: var(--surface-glass); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; justify-content: space-between; text-align: left; }
+.s-quick small { display: block; color: var(--muted); font-size: .8rem; margin-bottom: 2px; }
+.s-quick b { font-family: var(--display); font-weight: var(--dw); font-size: 1.9rem; letter-spacing: -.02em; }
+.s-fleet { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: clamp(32px, 5vw, 64px) clamp(18px, 3vw, 36px); }
+.s-tile { border-radius: var(--card-r); background: var(--surface); border: 1px solid var(--line); overflow: hidden; }
+.s-tile img { aspect-ratio: 16 / 10; object-fit: cover; width: 100%; }
+.s-tile div { padding: 18px 20px 20px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.s-tile h4 { margin: 0; font-family: var(--display); font-weight: var(--dw); letter-spacing: var(--dt); text-transform: var(--dcase); font-size: 1.15rem; }
+.s-tile span { color: var(--muted); font-size: .9rem; white-space: nowrap; } .s-tile span b { color: var(--ink); font-size: 1.15rem; font-weight: 600; }
+.s-foot { padding: clamp(32px, 5vw, 64px) clamp(18px, 3vw, 36px); border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
+.s-foot .logo { font-size: clamp(1.6rem, 4vw, 3rem); }
+.s-foot small { color: var(--muted); }
+@media (max-width: 760px) { .sign { width: 92%; } .sign b { font-size: 1rem; } .s-nav { display: none; } .s-head .s-btn { margin-left: auto; } .s-fleet { grid-template-columns: 1fr; } }
+.lab-foot { padding: 48px 0 80px; color: #86868b; font-size: .9rem; border-top: 1px solid #1a1a1a; }
+.lab-foot p { max-width: 80ch; margin: 0 0 10px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .overview a { transition: none; } }
+</style>
+</head>
+<body>
+<nav class="lab-top" aria-label="Identities"><div class="wrap" id="index"><strong>Brand lab</strong></div></nav>
+
+<header class="lab-intro"><div class="wrap">
+  <h1>Seven names, seven identities, one chauffeur service</h1>
+  <p>Proposals to react to, not decisions. Each one has a name, the idea behind it, a symbol, a wordmark, colours, type, and a slice of the real website dressed in it. The car is our own render, lit differently for each identity.</p>
+  <p>Six are mine, one (Quiet Mile) is Codex's, and Codex scored all of them as a second opinion: its notes are blunt on purpose.</p>
+  <p>Nothing here is registered or checked for trademarks. Domain notes are a DNS lookup on 2026-09-21, which only shows whether something answers today.</p>
+</div></header>
+<div class="wrap"><div class="overview" id="overview"></div></div>
+
+<main id="brands"></main>
+
+<footer class="lab-foot"><div class="wrap">
+  <p>How to read this: pick by the name first (say it on the phone, read it on a name sign), then by the mood. Colours and type can move between names; a name cannot be fixed later.</p>
+  <p>Before any of these is used: a trademark search in the EU and Hungary (classes 39 and 12), the .com and .hu domains, the Instagram and Google Business Profile handles, and a native English speaker saying it out loud.</p>
+  <p>Car: Blender render of a third-party 3D model (Mercedes-Benz Maybach 2022 by mpgs.studio, CC BY 4.0), repainted. Fleet tiles include models with unverified licences: staging only. Fonts: SIL Open Font License.</p>
+</div></footer>
+
+<script>
+(function () {
+  'use strict';
+  /* symbols, all on a 40 x 40 grid, drawn with currentColor */
+  var S = {
+    ister: '<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 13c5.3-5 10.7 5 16 0s10.700-5 16 0"/><path d="M4 21c5.3-5 10.7 5 16 0s10.700-5 16 0"/><path d="M10 29c3.300-3.200 6.700 3.200 10 0s6.700-3.200 10 0"/></svg>',
+    km0: '<svg viewBox="0 0 40 40" fill="none" aria-hidden="true"><ellipse cx="20" cy="20" rx="12.500" ry="16.500" stroke="currentColor" stroke-width="3"/><circle cx="20" cy="20" r="3.400" fill="currentColor"/></svg>',
+    e19: '<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linecap="round" aria-hidden="true"><circle cx="20" cy="20" r="15.500"/><path d="M26 2.500v35"/><path d="M4.500 20h31" opacity=".35"/><circle cx="26" cy="15" r="2.400" fill="currentColor" stroke="none"/></svg>',
+    hollo: '<svg viewBox="0 0 40 40" fill="currentColor" aria-hidden="true"><path d="M3 30C8 12 22 4 37 6c-7 2.500-11.500 6.500-13.500 12 4.500-2.500 8.500-3 12.500-2-7 2.500-11 7-12.500 14-3-6-9-8-20.500 0z"/></svg>',
+    argyus: '<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.600" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 35 20 5l15 30"/><path d="M20 35v-5M20 24v-4M20 15.500v-2" stroke-width="2"/></svg>',
+    qm: '<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" aria-hidden="true"><path d="M5 27c8 0 9-13 17-13 5 0 7 4 13 4"/><circle cx="35" cy="18" r="2.600" fill="currentColor" stroke="none"/><circle cx="5" cy="27" r="1.400" fill="currentColor" stroke="none"/></svg>',
+    ph: '<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.600" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 33V7h7.500a6.500 6.500 0 0 1 0 13H9"/><path d="M22.500 20H31M31 7v26"/></svg>'
+  };
+  var B = [
+    { id: 'ister', score: '6/10', sym: S.ister, name: 'Ister', word: 'ISTER', sub: 'Budapest chauffeur', tag: 'The Danube, by its oldest name.',
+      why: ['<b>The idea.</b> Ister is what the Romans called the lower Danube. Five letters, easy to say, nobody else in the category sounds like it.', '<b>The mood.</b> Old-world calm: a hotel concierge rather than an app. Serif capitals with air between them, river-green black, pale stone, no gold.', '<b>Watch out.</b> People may hear "Easter" or "sister". It needs the descriptor "Budapest chauffeur" beside it until it is known.'],
+      meta: ['ister.hu answers (taken)', 'isterchauffeur.com silent', 'Cormorant Garamond + Inter'],
+      v: { bg: '#060d0b', surface: '#0d1814', 'site-bg': '#050b09', 'site-head': 'rgba(6,13,11,.9)', 'surface-glass': 'rgba(13,24,20,.78)', ink: '#eef2ee', muted: '#93a39b', accent: '#9fd8c0', 'accent-dark': '#1f5a49', 'on-accent': '#04120d', line: 'rgba(159,216,192,.14)', 'line-strong': 'rgba(159,216,192,.4)', paper: '#ece8df', 'paper-ink': '#10211b', 'icon-bg': 'linear-gradient(160deg,#173a30,#07130f)', 'icon-ink': '#c9ead9',
+        display: '"Cormorant", Georgia, serif', body: '"Inter", sans-serif', dw: 500, dt: '.01em', dcase: 'none', lw: 500, lt: '.34em', lcase: 'uppercase', 'btn-r': '4px', 'card-r': '10px', eyebrow: '500 .74rem/1 "Inter", sans-serif', 'eyebrow-t': '.26em', 'eyebrow-case': 'uppercase' },
+      chips: [['#060d0b', 'River black', '#eef2ee'], ['#0d1814', 'Deep bank', '#eef2ee'], ['#1f5a49', 'Ister green', '#eef2ee'], ['#9fd8c0', 'Mist', '#04120d'], ['#ece8df', 'Stone', '#10211b']],
+      type: ['Arrive in Style', 'Cormorant Garamond 500 for names and headlines, Inter for everything you have to read fast.'], img: 'ister' },
+    { id: 'km0', score: '8/10', sym: S.km0, name: 'Kilometre Zero', word: 'Kilometre <i>Zero</i>', sub: '', tag: 'Every journey starts at zero.',
+      why: ['<b>The idea.</b> At the Buda end of the Chain Bridge stands the Zero Kilometre Stone: every road distance in Hungary is measured from it. A chauffeur brand that starts where the roads start.', '<b>The mood.</b> Modern and exact, like a dashboard. A zero with a point in it, geometric grotesk, mono numerals, one warm signal colour on black.', '<b>Watch out.</b> Long to type and "kilometre / kilometer" splits the spelling. The short form KM0 carries the handle, the icon and the domain.'],
+      meta: ['kilometrezero.com answers (taken)', 'kilometrezero.hu, km0.hu silent', 'Space Grotesk + JetBrains Mono'],
+      v: { bg: '#000000', surface: '#111112', 'site-bg': '#000', 'site-head': 'rgba(0,0,0,.86)', 'surface-glass': 'rgba(22,22,23,.78)', ink: '#f5f5f7', muted: '#98989d', accent: '#ff6a3d', 'accent-dark': '#d9481c', 'on-accent': '#140500', line: 'rgba(255,255,255,.1)', 'line-strong': 'rgba(255,255,255,.34)', paper: '#f4f2ee', 'paper-ink': '#0b0b0c', 'icon-bg': '#0b0b0c', 'icon-ink': '#ff6a3d',
+        display: '"Space Grotesk", sans-serif', body: '"Space Grotesk", sans-serif', dw: 500, dt: '-.035em', dcase: 'none', lw: 500, lt: '-.03em', lcase: 'none', 'btn-r': '999px', 'card-r': '22px', eyebrow: '500 .74rem/1 "JetBrains Mono", monospace', 'eyebrow-t': '.12em', 'eyebrow-case': 'uppercase' },
+      chips: [['#000000', 'Asphalt', '#f5f5f7'], ['#111112', 'Tunnel', '#f5f5f7'], ['#98989d', 'Marker', '#000'], ['#ff6a3d', 'Signal', '#140500'], ['#f4f2ee', 'Stone', '#0b0b0c']],
+      type: ['KM 0 to KM 243', 'Space Grotesk for everything, JetBrains Mono for distances, prices and times.'], img: 'km0' },
+    { id: 'e19', score: '7/10', sym: S.e19, name: 'Nineteen East', word: 'Nineteen <i>East</i>', sub: '', tag: 'Budapest, on the 19th meridian.',
+      why: ['<b>The idea.</b> Budapest lies on 19 degrees east. A place told the way a pilot or a navigator would tell it: quiet, precise, international.', '<b>The mood.</b> The closest to the current site: thin modern sans, midnight blue-black, one ice blue. A meridian through a circle with the city marked on it.', '<b>Watch out.</b> It does not say Budapest or chauffeur by itself, and "19 East" sounds a little like a bar or an address. Strongest as a name for hotels and corporate accounts.'],
+      meta: ['nineteeneast.com, .hu silent', '19east.hu silent', 'Manrope + Inter'],
+      v: { bg: '#04070d', surface: '#0b111c', 'site-bg': '#03060b', 'site-head': 'rgba(4,7,13,.88)', 'surface-glass': 'rgba(11,17,28,.78)', ink: '#f1f5fb', muted: '#8d9bb0', accent: '#8ec5ff', 'accent-dark': '#1d5fa8', 'on-accent': '#02101f', line: 'rgba(142,197,255,.13)', 'line-strong': 'rgba(142,197,255,.4)', paper: '#eef2f7', 'paper-ink': '#0a1424', 'icon-bg': 'linear-gradient(160deg,#12284a,#04070d)', 'icon-ink': '#a9d3ff',
+        display: '"Manrope", sans-serif', body: '"Inter", sans-serif', dw: 300, dt: '-.035em', dcase: 'none', lw: 400, lt: '-.01em', lcase: 'none', 'btn-r': '999px', 'card-r': '26px', eyebrow: '500 .78rem/1 "Inter", sans-serif', 'eyebrow-t': '.2em', 'eyebrow-case': 'uppercase' },
+      chips: [['#04070d', 'Midnight', '#f1f5fb'], ['#0b111c', 'Deck', '#f1f5fb'], ['#1d5fa8', 'Meridian', '#f1f5fb'], ['#8ec5ff', 'Ice', '#02101f'], ['#eef2f7', 'Chart', '#0a1424']],
+      type: ['47.50 N 19.04 E', 'Manrope Light for headlines, Inter for text. Big, thin and calm.'], img: 'e19' },
+    { id: 'hollo', score: '5/10', sym: S.hollo, name: 'Holló', word: 'Holló', sub: 'Chauffeurs of Budapest', tag: 'The raven of Budapest.',
+      why: ['<b>The idea.</b> Holló is Hungarian for raven, the bird on King Matthias Corvinus\'s coat of arms. A black bird for black cars, and a story a chauffeur can tell in one sentence at the airport.', '<b>The mood.</b> Warm and Hungarian without folklore: soft serif, warm black, bone white, a single wing. It sits well next to Mátyás Király Udvara in the same group.', '<b>Watch out.</b> English speakers will say "hollow" or "hello", and the accent disappears in web addresses. It needs the line "Chauffeurs of Budapest" under it, always.'],
+      meta: ['hollo.hu answers (taken)', 'hollochauffeur.com, .hu silent', 'Fraunces + Inter'],
+      v: { bg: '#0d0b09', surface: '#171310', 'site-bg': '#0a0807', 'site-head': 'rgba(13,11,9,.9)', 'surface-glass': 'rgba(23,19,16,.8)', ink: '#f3eee6', muted: '#a39a8d', accent: '#e9dcc6', 'accent-dark': '#2a231c', 'on-accent': '#14100b', line: 'rgba(233,220,198,.12)', 'line-strong': 'rgba(233,220,198,.38)', paper: '#efe8dc', 'paper-ink': '#15110c', 'icon-bg': '#efe8dc', 'icon-ink': '#15110c',
+        display: '"Fraunces", Georgia, serif', body: '"Inter", sans-serif', dw: 380, dt: '-.02em', dcase: 'none', lw: 420, lt: '-.01em', lcase: 'none', 'btn-r': '999px', 'card-r': '20px', eyebrow: '500 .74rem/1 "Inter", sans-serif', 'eyebrow-t': '.22em', 'eyebrow-case': 'uppercase' },
+      chips: [['#0d0b09', 'Feather', '#f3eee6'], ['#171310', 'Walnut', '#f3eee6'], ['#2a231c', 'Bark', '#f3eee6'], ['#a39a8d', 'Ash', '#0d0b09'], ['#efe8dc', 'Bone', '#15110c']],
+      type: ['Your Chauffeur Waiting For You', 'Fraunces at a light weight for headlines, Inter for text. Already on the site: no new fonts to load.'], img: 'hollo' },
+    { id: 'argyus', score: '4/10', sym: S.argyus, name: 'Argyus', word: 'ARGYUS', sub: 'Chauffeur Budapest', tag: 'Eyes on the road.',
+      why: ['<b>The idea.</b> From the family name Árgyusi, and one letter from Argus, the guardian who never slept. A name with a person behind it: the opposite of an anonymous app.', '<b>The mood.</b> Automotive and confident: wide capitals like the lettering on a boot lid, graphite, one copper accent. The A is a road running to the horizon.', '<b>Watch out.</b> The spelling has to be learned (Argyus, not Argus), and argyus.com answers already. It also ties the brand to one family, which is a business decision before it is a design one.'],
+      meta: ['argyus.com answers (taken)', 'argyus.hu, argyuschauffeur.com silent', 'Syncopate + Inter'],
+      v: { bg: '#0b0b0c', surface: '#151516', 'site-bg': '#08080a', 'site-head': 'rgba(11,11,12,.9)', 'surface-glass': 'rgba(21,21,22,.8)', ink: '#f4f4f5', muted: '#9a9a9f', accent: '#e39a62', 'accent-dark': '#9c4f1d', 'on-accent': '#170a02', line: 'rgba(255,255,255,.1)', 'line-strong': 'rgba(227,154,98,.5)', paper: '#efefef', 'paper-ink': '#0b0b0c', 'icon-bg': 'linear-gradient(160deg,#2a2a2d,#0b0b0c)', 'icon-ink': '#e39a62',
+        display: '"Syncopate", sans-serif', body: '"Inter", sans-serif', dw: 700, dt: '.02em', dcase: 'uppercase', lw: 700, lt: '.2em', lcase: 'uppercase', 'btn-r': '6px', 'card-r': '14px', eyebrow: '400 .7rem/1 "Syncopate", sans-serif', 'eyebrow-t': '.24em', 'eyebrow-case': 'uppercase' },
+      chips: [['#0b0b0c', 'Graphite', '#f4f4f5'], ['#151516', 'Carbon', '#f4f4f5'], ['#9a9a9f', 'Alloy', '#0b0b0c'], ['#e39a62', 'Copper', '#170a02'], ['#efefef', 'Paper', '#0b0b0c']],
+      type: ['Arrive in style', 'Syncopate Bold in capitals for the name and short headlines only, Inter for every sentence.'], img: 'argyus', small: true },
+    { id: 'qm', sym: S.qm, name: 'Quiet Mile', word: 'quiet <i>mile</i>', sub: 'Budapest chauffeur service', tag: 'Private journeys from Budapest.', score: '8/10',
+      why: ['<b>The idea.</b> Codex\'s proposal, and the only one that names the feeling instead of the place: the calm of the back seat. Two plain English words anyone can say, spell and remember.', '<b>The mood.</b> Quiet luxury: lowercase, generous spacing, charcoal with one dusk-violet tone, a single route line that ends in a point. Nothing shouts.', '<b>Watch out.</b> Without the descriptor it could be a wellness or e-bike brand, and it says nothing about Budapest, so "Budapest chauffeur service" travels with it everywhere.'],
+      meta: ['quietmile.com answers (taken)', 'quietmile.hu, quietmilebudapest.com silent', 'Manrope + Inter'],
+      v: { bg: '#09090c', surface: '#131318', 'site-bg': '#07070a', 'site-head': 'rgba(9,9,12,.9)', 'surface-glass': 'rgba(19,19,24,.8)', ink: '#f2f1f6', muted: '#9996a8', accent: '#bdb6ee', 'accent-dark': '#4a3fa0', 'on-accent': '#0d0a24', line: 'rgba(189,182,238,.13)', 'line-strong': 'rgba(189,182,238,.42)', paper: '#f1f0f5', 'paper-ink': '#12111a', 'icon-bg': 'linear-gradient(160deg,#25213f,#09090c)', 'icon-ink': '#cfc9f5',
+        display: '"Manrope", sans-serif', body: '"Inter", sans-serif', dw: 400, dt: '-.03em', dcase: 'none', lw: 500, lt: '.02em', lcase: 'lowercase', 'btn-r': '999px', 'card-r': '24px', eyebrow: '500 .76rem/1 "Inter", sans-serif', 'eyebrow-t': '.2em', 'eyebrow-case': 'uppercase' },
+      chips: [['#09090c', 'Night', '#f2f1f6'], ['#131318', 'Cabin', '#f2f1f6'], ['#4a3fa0', 'Dusk', '#f2f1f6'], ['#bdb6ee', 'Haze', '#0d0a24'], ['#f1f0f5', 'Morning', '#12111a']],
+      type: ['Step in. It gets quiet.', 'Manrope for headlines, lowercase in the logo only; Inter for text.'], img: 'qm' },
+    { id: 'ph', score: '3/10', sym: S.ph, name: 'Premium Hungary', word: 'Premium <i>Hungary</i>', sub: 'Chauffeur service', tag: 'Your Mercedes, your driver, your day.',
+      why: ['<b>The idea.</b> The name you already use (the mailbox is premiumhungary). It says what and where in two words and needs no explanation on the phone.', '<b>The mood.</b> Exactly the staging site as it is today: Inter, black, ice blue, a plain PH monogram. The safe option, and the cheapest to launch.', '<b>Watch out.</b> "Premium" is the word every competitor uses, it is hard to protect as a trademark and hard to rank for. It describes a category, not a company.'],
+      meta: ['premiumhungary.com, .hu silent', 'Inter only', 'Matches the live preview'],
+      v: { bg: '#000000', surface: '#161617', 'site-bg': '#000', 'site-head': 'rgba(22,22,23,.8)', 'surface-glass': 'rgba(29,29,31,.78)', ink: '#f5f5f7', muted: '#a1a1a6', accent: '#f5f5f7', 'accent-dark': '#0066cc', 'on-accent': '#000', line: '#2a2a2d', 'line-strong': '#6e6e73', paper: '#f5f5f7', 'paper-ink': '#1d1d1f', 'icon-bg': '#f5f5f7', 'icon-ink': '#000',
+        display: '"Inter", sans-serif', body: '"Inter", sans-serif', dw: 600, dt: '-.03em', dcase: 'none', lw: 600, lt: '-.02em', lcase: 'none', 'btn-r': '999px', 'card-r': '28px', eyebrow: '600 1rem/1 "Inter", sans-serif', 'eyebrow-t': '.02em', 'eyebrow-case': 'none' },
+      chips: [['#000000', 'Black', '#f5f5f7'], ['#161617', 'Tile', '#f5f5f7'], ['#a1a1a6', 'Grey', '#000'], ['#8ec5ff', 'Ice', '#000'], ['#f5f5f7', 'Light', '#1d1d1f']],
+      type: ['Private Chauffeur Budapest', 'Inter 600 for headlines, Inter 400 for text. What the preview site uses now.'], img: 'ph', markAccent: '#8ec5ff' }
+  ];
+
+  var esc = function (o) { return Object.keys(o).map(function (k) { return '--' + k + ':' + String(o[k]).replace(/"/g, "'"); }).join(';'); };
+  var logo = function (b, cls, sub) { return '<span class="logo ' + (cls || '') + '">' + b.sym + '<span><span class="logo__word">' + b.word + '</span>' + (sub && b.sub ? '<span class="logo__sub">' + b.sub + '</span>' : '') + '</span></span>'; };
+  var idx = document.getElementById('index'), ov = document.getElementById('overview'), main = document.getElementById('brands');
+
+  B.forEach(function (b, n) {
+    var no = ('0' + (n + 1)).slice(-2), style = esc(b.v) + (b.markAccent ? ';--mark:' + b.markAccent : '');
+    idx.insertAdjacentHTML('beforeend', '<a href="#' + b.id + '">' + no + ' ' + b.name + '</a>');
+    ov.insertAdjacentHTML('beforeend', '<a href="#' + b.id + '" style="' + style + ';font-family:var(--body)">' + logo(b, b.small ? '' : '') + '<small>' + b.tag + '</small></a>');
+    main.insertAdjacentHTML('beforeend',
+      '<section class="brand" id="' + b.id + '" style="' + style + '"><div class="wrap">' +
+        '<div class="brand__head"><div><p class="brand__no">' + no + ' / 0' + B.length + '</p><h2 class="brand__name"' + (b.small ? ' style="font-size:clamp(2rem,5vw,4rem)"' : '') + '>' + b.name + '</h2><p class="brand__tag">' + b.tag + '</p></div>' +
+        '<div class="brand__why">' + b.why.map(function (p) { return '<p>' + p + '</p>'; }).join('') + '<div class="brand__meta">' + b.meta.concat(b.score ? ['Codex second opinion: ' + b.score] : []).map(function (m) { return '<span>' + m + '</span>'; }).join('') + '</div></div></div>' +
+        '<div class="board">' +
+          '<div class="tile tile--logo"><h3>Logo on dark</h3>' + logo(b, 'logo--xl logo--stack', true) + '</div>' +
+          '<div class="tile tile--light"><h3>On light</h3>' + logo(b, 'logo--xl', true) + '</div>' +
+          '<div class="tile tile--icon"><h3>App icon</h3><div class="appicon">' + b.sym + '</div></div>' +
+          '<div class="tile tile--colors"><div class="chips">' + b.chips.map(function (c) { return '<div style="background:' + c[0] + ';color:' + c[2] + '">' + c[1] + '<br>' + c[0] + '</div>'; }).join('') + '</div></div>' +
+          '<div class="tile tile--type"><h3>Type</h3><p class="type-big"' + (b.small ? ' style="font-size:1.5rem"' : '') + '>' + b.type[0] + '</p><p class="type-body">' + b.type[1] + '</p></div>' +
+          '<div class="tile tile--sign"><h3>Name sign</h3><div class="sign"><div><b>Ms Eleanor Hart</b>' + logo(b, '', false) + '</div></div></div>' +
+        '</div>' +
+        '<div class="slice-label"><span>The website in this identity</span><span>Same layout as the live preview</span></div>' +
+        '<div class="slice">' +
+          '<div class="s-head">' + logo(b) + '<div class="s-nav"><span>Airport Transfer</span><span>City-to-City</span><span>Hourly</span><span>Fleet</span></div><a class="s-btn s-btn--sm" href="#' + b.id + '">Get a Free Quote</a></div>' +
+          '<div class="s-hero"><p class="s-eyebrow">Arrive in Style</p><h2' + (b.small ? ' style="font-size:clamp(1.5rem,3.6vw,2.9rem);max-width:20ch"' : '') + '>Private Chauffeur Budapest</h2><p>Fixed prices, English-speaking drivers and a Mercedes waiting for your journey.</p>' +
+            '<div class="s-cta"><a class="s-btn" href="#' + b.id + '">Book Your Chauffeur</a><a class="s-btn s-btn--ghost" href="#' + b.id + '">Message us on WhatsApp</a></div>' +
+            '<div class="s-car"><img src="img/hero-' + b.img + '.jpg" alt="Black Mercedes-Benz S-Class in a dark studio, lit for the ' + b.name + ' identity" loading="' + (n ? 'lazy' : 'eager') + '" width="1920" height="1080"></div></div>' +
+          '<div class="s-quick"><div><small>V-Class, Budapest Airport and Budapest</small><b>&euro;75</b></div><div><small>Fixed price. Tax &amp; Tolls Included.</small><span style="color:var(--muted);font-size:.9rem">A request, not a booking yet.</span></div><a class="s-btn" href="#' + b.id + '">Book Your Chauffeur</a></div>' +
+          '<div class="s-fleet">' + [['e', 'E-Class', '65'], ['v', 'V-Class', '75'], ['s', 'S-Class', '115']].map(function (c) { return '<div class="s-tile"><img src="../img/class-' + c[0] + '-800.jpg" alt="" loading="lazy" width="800" height="500"><div><h4>' + c[1] + '</h4><span>Airport <b>&euro;' + c[2] + '</b></span></div></div>'; }).join('') + '</div>' +
+          '<div class="s-foot">' + logo(b, '', true) + '<small>+36 30 601 2000</small></div>' +
+        '</div>' +
+      '</div></section>');
+  });
+})();
+</script>
+</body>
+</html>
