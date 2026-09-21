@@ -173,8 +173,55 @@
     form.addEventListener('input', function () { updateSum(form); });
     form.addEventListener('change', function () { updateSum(form); });
     updateSum(form);
-    form.addEventListener('submit', function (e) { submit(e, form); });
+    form.addEventListener('submit', function (e) { if (form._step === 1) { e.preventDefault(); goStep(form, 2); return; } submit(e, form); });
+    if (form.hasAttribute('data-steps')) {
+      var nx = $('[data-next]', form), bk = $('[data-back]', form), cp = $('[data-copy-recap]', form);
+      if (nx) nx.addEventListener('click', function () { goStep(form, 2); });
+      if (bk) bk.addEventListener('click', function () { goStep(form, 1, true); });
+      if (cp) cp.addEventListener('click', function () {
+        var txt = recap(form).join(' · ');
+        var ok = function () { var o = cp.textContent; cp.textContent = L.copied; setTimeout(function () { cp.textContent = o; }, 1600); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, function () {}); 
+      });
+      goStep(form, 1, true, true);
+    }
   });
+
+  /* ---------- the request in two steps ----------
+     Step 1 is the journey, step 2 is who is asking. The journey is read back as one line before anything is
+     sent. Without JavaScript both steps simply show, so the form still works. */
+  function recap(form) {
+    var v = function (n) { var el = form.elements[n]; return el && el.value ? String(el.value).trim() : ''; };
+    var svc = $('input[name=service]:checked', form), cls = $('select[name=vehicle_class]', form);
+    var out = [];
+    if (svc) out.push(svc.value);
+    if (cls && cls.selectedOptions[0]) out.push(cls.selectedOptions[0].textContent);
+    var dv = v('date'), nice = dv;
+    if (dv) { try { nice = new Date(dv + 'T12:00:00').toLocaleDateString(d.documentElement.lang || 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) {} }
+    var when = [nice, v('time')].filter(Boolean).join(', '); if (when) out.push(when);
+    if (v('route')) out.push(v('route'));
+    if (v('passengers')) out.push(v('passengers') + ' ' + (v('passengers') === '1' ? L.pax_one : L.pax_many));
+    if (v('luggage')) out.push(v('luggage') + ' ' + (v('luggage') === '1' ? L.bag_one : L.bag_many));
+    if (v('flight_number')) out.push(v('flight_number'));
+    var product = productOf(form), pr = product && cls ? priceFor(product, cls.value) : null;
+    out.push(pr ? pr.text + ' ' + L.price_note : L.price_tbc);
+    return out;
+  }
+  function goStep(form, n, skipCheck, silent) {
+    var s1 = $('[data-step="1"]', form), s2 = $('[data-step="2"]', form); if (!s1 || !s2) return;
+    if (n === 2 && !skipCheck) {
+      clearErr(form);
+      var bad = $$('input,select,textarea', s1).filter(function (i) { return i.willValidate && !i.checkValidity(); });
+      if (bad.length) { bad.forEach(function (i) { setErr(i, i.validity.valueMissing ? L.required : L.invalid); }); bad[0].focus(); say(form, L.fix, 'error'); return; }
+      say(form, '');
+    }
+    form._step = n;
+    s1.hidden = n !== 1; s2.hidden = n !== 2;
+    var back = $('[data-back]', form); if (back) back.hidden = n !== 2;
+    var label = $('[data-step-label]', form); if (label) label.textContent = n === 1 ? L.step1 : L.step2;
+    if (n === 2) { var box = $('[data-recap]', form); if (box) { $('[data-recap-text]', box).textContent = recap(form).join(' · '); box.hidden = false; } }
+    if (!silent && label) { label.focus({ preventScroll: true }); var sc = form.closest('.formbox'); if (sc && sc.scrollTo) sc.scrollTo({ top: 0 }); }
+  }
 
   function openQuote(btn) {
     if (!sheet || !sheet.showModal) { location.hash = '#quote'; return; }
@@ -192,6 +239,7 @@
     var dt = btn && btn.getAttribute('data-date'); if (dt) $('input[name=date]', form).value = dt;
     form._shown = performance.now();
     updateSum(form);
+    if (form.hasAttribute('data-steps')) goStep(form, 1, true, true);
     sheet.showModal();
     track('quote_open');
     var first = $('input[name=route]', form); if (first) first.focus();
@@ -245,10 +293,12 @@
     if (form.getAttribute('data-mode') === 'whatsapp') {
       /* Journey details only. The visitor reviews and sends the message in WhatsApp: that is the contact,
          so this counts as a WhatsApp click, not as a lead. */
-      var lines = [waText(data.get('service'), data.get('date'))];
+      var lines = [L.wa_hello, waText(data.get('service'), data.get('date'))];
       [['route', L.f_route], ['time', L.f_time], ['vehicle_class', L.f_class], ['passengers', L.f_pax], ['luggage', L.f_bags], ['flight_number', L.f_flight], ['note', L.f_note]].forEach(function (k) {
-        if (data.get(k[0])) lines.push(k[1] + ': ' + data.get(k[0]));
+        if (data.get(k[0])) lines.push(k[1] + ': ' + (k[0] === 'vehicle_class' ? $('select[name=vehicle_class]', form).selectedOptions[0].textContent : data.get(k[0])));
       });
+      lines.push(L.wa_price + ': ' + (pr ? pr.text : L.price_tbc));
+      lines.push(L.wa_close);
       btn.disabled = true;
       var w = window.open(waBase + '?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener');
       setTimeout(function () { btn.disabled = false; }, 2500);
