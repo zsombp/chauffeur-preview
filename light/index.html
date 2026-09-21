@@ -13,7 +13,7 @@
 <link rel="icon" href="/chauffeur-preview/assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/chauffeur-preview/assets/fonts/fraunces-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/chauffeur-preview/assets/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/chauffeur-preview/assets/css/site.css?v=8b878cdf">
+<link rel="stylesheet" href="/chauffeur-preview/assets/css/site.css?v=857c9209">
 <script>document.documentElement.classList.replace('no-js','js');try{if(sessionStorage.getItem('seen'))document.documentElement.classList.add('seen');else sessionStorage.setItem('seen','1')}catch(e){}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "LocalBusiness", "@id": "/#org", "name": "Ister Limousine Service", "url": "/", "telephone": "+36306012000", "email": "premiumhungary@gmail.com", "areaServed": ["Budapest", "Vienna", "Prague", "Bratislava"], "priceRange": "EUR 65 to 1150", "address": {"@type": "PostalAddress", "addressLocality": "Budapest", "addressCountry": "HU"}}]}</script>
 </head>
@@ -39,7 +39,14 @@
 </header>
 
 <main id="main">
-<section class="hero hero--home">
+<section class="hero hero--home hero--place">
+  <div class="hero__bg"><picture>
+  <source type="image/avif" srcset="/chauffeur-preview/assets/img/hero-place-480.avif 480w, /chauffeur-preview/assets/img/hero-place-640.avif 640w, /chauffeur-preview/assets/img/hero-place-800.avif 800w, /chauffeur-preview/assets/img/hero-place-960.avif 960w, /chauffeur-preview/assets/img/hero-place-1200.avif 1200w, /chauffeur-preview/assets/img/hero-place-1536.avif 1536w" sizes="100vw">
+  <source type="image/webp" srcset="/chauffeur-preview/assets/img/hero-place-480.webp 480w, /chauffeur-preview/assets/img/hero-place-640.webp 640w, /chauffeur-preview/assets/img/hero-place-800.webp 800w, /chauffeur-preview/assets/img/hero-place-960.webp 960w, /chauffeur-preview/assets/img/hero-place-1200.webp 1200w, /chauffeur-preview/assets/img/hero-place-1536.webp 1536w" sizes="100vw">
+  <img src="/chauffeur-preview/assets/img/hero-place-800.jpg" srcset="/chauffeur-preview/assets/img/hero-place-480.jpg 480w, /chauffeur-preview/assets/img/hero-place-640.jpg 640w, /chauffeur-preview/assets/img/hero-place-800.jpg 800w, /chauffeur-preview/assets/img/hero-place-960.jpg 960w, /chauffeur-preview/assets/img/hero-place-1200.jpg 1200w, /chauffeur-preview/assets/img/hero-place-1536.jpg 1536w" sizes="100vw"
+       width="1536" height="1024" alt="Our black Mercedes-Benz V-Class on the Danube embankment in Budapest at dusk, the Parliament across the river" fetchpriority="high" decoding="async">
+</picture>
+</div>
   <div class="wrap">
     <div class="hero__copy">
       <p class="eyebrow">Arrive in Style</p>
@@ -50,16 +57,8 @@
         <button class="btn btn--ghost" type="button" data-open-quote>Book Your Chauffeur</button>
       </div>
       <p class="hero__price"><span>Airport transfer from</span> <strong class="num">&euro;65</strong> <span>Fixed price. Tax &amp; Tolls Included.</span></p>
-      <p class="fine-note fine-note--center">A request, not a booking yet. No payment is taken on this site: we confirm availability and the fixed price with you first.</p>
     </div>
   </div>
-  <div class="hero__car"><div><picture>
-  <source type="image/avif" srcset="/chauffeur-preview/assets/img/hero-dark-light-480.avif 480w, /chauffeur-preview/assets/img/hero-dark-light-640.avif 640w, /chauffeur-preview/assets/img/hero-dark-light-800.avif 800w, /chauffeur-preview/assets/img/hero-dark-light-960.avif 960w, /chauffeur-preview/assets/img/hero-dark-light-1200.avif 1200w, /chauffeur-preview/assets/img/hero-dark-light-1536.avif 1536w" sizes="100vw">
-  <source type="image/webp" srcset="/chauffeur-preview/assets/img/hero-dark-light-480.webp 480w, /chauffeur-preview/assets/img/hero-dark-light-640.webp 640w, /chauffeur-preview/assets/img/hero-dark-light-800.webp 800w, /chauffeur-preview/assets/img/hero-dark-light-960.webp 960w, /chauffeur-preview/assets/img/hero-dark-light-1200.webp 1200w, /chauffeur-preview/assets/img/hero-dark-light-1536.webp 1536w" sizes="100vw">
-  <img src="/chauffeur-preview/assets/img/hero-dark-light-800.jpg" srcset="/chauffeur-preview/assets/img/hero-dark-light-480.jpg 480w, /chauffeur-preview/assets/img/hero-dark-light-640.jpg 640w, /chauffeur-preview/assets/img/hero-dark-light-800.jpg 800w, /chauffeur-preview/assets/img/hero-dark-light-960.jpg 960w, /chauffeur-preview/assets/img/hero-dark-light-1200.jpg 1200w, /chauffeur-preview/assets/img/hero-dark-light-1536.jpg 1536w" sizes="100vw"
-       width="1536" height="1024" alt="Black Mercedes-Benz V-Class of our fleet, front three-quarter view" fetchpriority="high" decoding="async">
-</picture>
-</div></div>
 </section>
 
 <section class="quick" aria-label="See your fixed price"><div class="wrap" style="max-width:1080px">
@@ -70,10 +69,11 @@
 <option value="airport" data-for="airport">Budapest Airport and Budapest, either direction</option><option value="vienna" data-for="city">Budapest and Vienna</option><option value="vienna_airport" data-for="city">Vienna Airport to Budapest</option><option value="prague" data-for="city">Budapest and Prague</option><option value="bratislava" data-for="city">Budapest and Bratislava</option><option value="hourly" data-for="hourly">Chauffeur by the hour in Budapest</option><option value="tours" data-for="tours">Private tour</option></select></div>
     <div class="field"><label for="qd">Date</label><input id="qd" name="q_date" type="date"></div>
     <div class="field"><label for="qc">Vehicle class</label><select id="qc" name="q_class">
-<option value="e">E-Class</option><option value="v" selected>V-Class</option><option value="s">S-Class</option></select></div>
+<option value="e" selected>E-Class</option><option value="v">V-Class</option><option value="s">S-Class</option></select></div>
     <button class="btn" type="button" data-open-quote data-quick-go>Book Your Chauffeur</button>
-    <p class="quick__price" data-quick-price aria-live="polite"><strong class="num">&euro;75</strong><span>Fixed price. Tax &amp; Tolls Included.</span></p>
+    <p class="quick__price" data-quick-price aria-live="polite"><strong class="num">&euro;65</strong><span>Fixed price. Tax &amp; Tolls Included.</span></p>
   </form>
+  <p class="fine-note fine-note--center quick__note">A request, not a booking yet. No payment is taken on this site: we confirm availability and the fixed price with you first.</p>
 </div></section>
 
 <section class="ribbon" aria-label="Why travel with us"><div class="wrap"><ul>
@@ -233,11 +233,6 @@
 </div>
 </div></section>
 
-<section class="pit" data-pit aria-labelledby="pit-h">
-  <div class="wrap pit__head"><p class="eyebrow">On every journey</p><h2 id="pit-h">Comfort comes as standard</h2><p class="lead">Water, Wi-Fi and onboard chargers are ready in every car.</p></div>
-  <ul class="pit__stage" data-pit-stage>
-<li class="pit__pill pit__pill--ink">Fixed Price. No Surprise.</li><li class="pit__pill pit__pill--white">Tax &amp; Tolls Included</li><li class="pit__pill pit__pill--sky">English-speaking drivers</li><li class="pit__pill pit__pill--white">24/7 Availability</li><li class="pit__pill pit__pill--butter">Bottled water</li><li class="pit__pill pit__pill--white">Free Wi-Fi</li><li class="pit__pill pit__pill--ink">Onboard chargers</li><li class="pit__pill pit__pill--white">Leather interior</li><li class="pit__pill pit__pill--sky">Climate control</li><li class="pit__pill pit__pill--white">Tracked flights</li><li class="pit__pill pit__pill--butter">Meet &amp; Greet Airport Transfer</li><li class="pit__pill pit__pill--white">High-End Mercedes-Benz Fleet</li>  </ul>
-</section>
 
 <section class="sec light"><div class="wrap">
   <div class="sec__head" style="text-align:center;margin-inline:auto;justify-items:center"><p class="eyebrow">How it works</p><h2>Three simple steps</h2><p class="lead">Share the details, confirm the journey, then meet your chauffeur.</p></div>
@@ -305,7 +300,7 @@
   </div>
   <div class="form__step" data-step="2">
   <div class="form__recap c6" data-recap hidden><span class="form__recap-label">Your journey</span><p data-recap-text></p>
-    <button class="form__copy" type="button" data-copy-recap>&lt;built-in method copy of dict object at 0x10acbdb80&gt;</button></div>
+    <button class="form__copy" type="button" data-copy-recap>&lt;built-in method copy of dict object at 0x10a35d580&gt;</button></div>
   <div class="field c2" data-contact-field><label for="q-name">Name</label><input id="q-name" name="name" type="text" autocomplete="name" required></div>
   <div class="field c2" data-contact-field><label for="q-email">Email</label><input id="q-email" name="email" type="email" autocomplete="email" inputmode="email" required></div>
   <div class="field c2" data-contact-field><label for="q-phone">Phone</label><input id="q-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="Include your country code" required></div>
@@ -383,7 +378,7 @@
   </div>
   <div class="form__step" data-step="2">
   <div class="form__recap c6" data-recap hidden><span class="form__recap-label">Your journey</span><p data-recap-text></p>
-    <button class="form__copy" type="button" data-copy-recap>&lt;built-in method copy of dict object at 0x10acbdb80&gt;</button></div>
+    <button class="form__copy" type="button" data-copy-recap>&lt;built-in method copy of dict object at 0x10a35d580&gt;</button></div>
   <div class="field c2" data-contact-field><label for="s-name">Name</label><input id="s-name" name="name" type="text" autocomplete="name" required></div>
   <div class="field c2" data-contact-field><label for="s-email">Email</label><input id="s-email" name="email" type="email" autocomplete="email" inputmode="email" required></div>
   <div class="field c2" data-contact-field><label for="s-phone">Phone</label><input id="s-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="Include your country code" required></div>
@@ -410,7 +405,7 @@
 </section>
 
 <script type="application/json" id="price-data">{"products": {"airport": {"unit": "transfer", "e": 65, "v": 75, "s": 115}, "hourly": {"unit": "hour", "min_hours": 3, "e": 65, "v": 75, "s": 115}, "vienna": {"unit": "transfer", "e": 325, "v": 395, "s": 650}, "vienna_airport": {"unit": "transfer", "e": null, "v": null, "s": null}, "prague": {"unit": "transfer", "e": 615, "v": 825, "s": 1150}, "bratislava": {"unit": "transfer", "e": null, "v": null, "s": null}, "tours": {"unit": "hour", "min_hours": 4, "v": 120}, "vip": {"unit": "hour", "rate": 155, "vehicles": ["G-Class", "VIP V-Class"]}}, "labels": {"per_hour": "per hour", "on_request": "Price on request", "on_request_note": "Tell us your date and we will send a fixed price.", "price_note": "Fixed price. Tax \u0026 Tolls Included.", "min_hours": "Minimum {n} hours.", "s_note": "Limited availability. Please book in advance.", "required": "Required", "invalid": "Please check this field.", "fix": "Please check the highlighted fields.", "sending": "Sending your request", "error": "We could not confirm receipt of your request. Please try again or contact us by phone or WhatsApp.", "sent_whatsapp": "We have opened WhatsApp with your journey details. Nothing has reached us yet: press send there. If WhatsApp did not open, call or email us.", "whatsapp_action": "Continue in WhatsApp", "handoff_note": "The online form is not connected yet. Please call or open WhatsApp to send your request. Send the message in your chosen app to contact us. Opening a draft does not submit a request.", "retry": "That was quick. Please press send once more.", "f_route": "Route or service details", "f_time": "Pickup time", "f_class": "Vehicle class", "f_pax": "Passengers", "f_bags": "Bags", "f_flight": "Flight number", "f_note": "Notes", "step1": "1 of 2, your journey", "step2": "2 of 2, your details", "price_tbc": "Price confirmed with your request", "pax_one": "passenger", "pax_many": "passengers", "bag_one": "bag", "bag_many": "bags", "copied": "Copied", "wa_hello": "Hello, I would like to request a chauffeur journey.", "wa_price": "Displayed price", "wa_close": "Please confirm availability and the fixed price."}, "routes": {"vienna": 1, "vienna_airport": 1, "prague": 1, "bratislava": 1}, "thanks_url": "/chauffeur-preview/light/thank-you/"}</script>
-<script src="/chauffeur-preview/assets/js/site.js?v=8b878cdf" defer></script>
-<script src="/chauffeur-preview/assets/js/fx.js?v=8b878cdf" defer></script>
+<script src="/chauffeur-preview/assets/js/site.js?v=857c9209" defer></script>
+<script src="/chauffeur-preview/assets/js/fx.js?v=857c9209" defer></script>
 </body>
 </html>
