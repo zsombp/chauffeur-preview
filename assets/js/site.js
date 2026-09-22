@@ -199,7 +199,8 @@
     var dv = v('date'), nice = dv;
     if (dv) { try { nice = new Date(dv + 'T12:00:00').toLocaleDateString(d.documentElement.lang || 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) {} }
     var when = [nice, v('time')].filter(Boolean).join(', '); if (when) out.push(when);
-    if (v('route')) out.push(v('route'));
+    if (v('pickup') || v('destination')) out.push([v('pickup'), v('destination')].filter(Boolean).join(' to '));
+    else if (v('route')) out.push(v('route'));
     if (v('passengers')) out.push(v('passengers') + ' ' + (v('passengers') === '1' ? L.pax_one : L.pax_many));
     if (v('luggage')) out.push(v('luggage') + ' ' + (v('luggage') === '1' ? L.bag_one : L.bag_many));
     if (v('flight_number')) out.push(v('flight_number'));
@@ -294,7 +295,7 @@
       /* Journey details only. The visitor reviews and sends the message in WhatsApp: that is the contact,
          so this counts as a WhatsApp click, not as a lead. */
       var lines = [L.wa_hello, waText(data.get('service'), data.get('date'))];
-      [['route', L.f_route], ['time', L.f_time], ['vehicle_class', L.f_class], ['passengers', L.f_pax], ['luggage', L.f_bags], ['flight_number', L.f_flight], ['note', L.f_note]].forEach(function (k) {
+      [['pickup', L.f_pickup], ['destination', L.f_dest], ['route', L.f_route], ['time', L.f_time], ['vehicle_class', L.f_class], ['passengers', L.f_pax], ['luggage', L.f_bags], ['flight_number', L.f_flight], ['note', L.f_note]].forEach(function (k) {
         if (data.get(k[0])) lines.push(k[1] + ': ' + (k[0] === 'vehicle_class' ? $('select[name=vehicle_class]', form).selectedOptions[0].textContent : data.get(k[0])));
       });
       lines.push(L.wa_price + ': ' + (pr ? pr.text : L.price_tbc));
