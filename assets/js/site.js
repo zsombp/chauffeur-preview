@@ -105,155 +105,196 @@
     return '';
   }
 
-  /* ---------- quote forms ---------- */
+  /* ---------- the booking panel ----------
+     Vince, 2026-09-28: "Book Your Chauffeur" is for the rides with a fixed price, "Get a Free Quote" is a personal
+     inquiry for a tailored offer. Both stay short ("just book it, we chase them for the rest") and both end in
+     WhatsApp. Without an endpoint the form is a WhatsApp handover: the guest reads the message and sends it there.
+     Only what the guest typed for the journey travels in that link, and if they book for someone else, the
+     passenger's name and number, which is the point of that box. The sender's own details are never asked for:
+     the chat shows who is writing. */
   var sheet = $('[data-sheet]');
   var waBase = 'https://wa.me/' + body.getAttribute('data-wa');
+  var MAIL = body.getAttribute('data-mail') || '';
+  var PLACES = PRICES.places || [], TOURS = PRICES.tours || {}, JOURNEYS = PRICES.journeys || [];
   function waText(service, date) {
     var tpl = body.getAttribute('data-wa-text');
     /* Without a date the sentence must still read properly. */
     if (!date) tpl = tpl.replace(/\s+\S+\s+\{date\}/, '');
     return tpl.replace('{service}', service || '').replace('{date}', date || '').replace(/\s+/g, ' ').trim();
   }
-  /* The page's WhatsApp links carry the page's own service and nothing a visitor typed. */
+  function field(form, name) { var el = form.elements[name]; return el && el.value != null ? String(el.value).trim() : ''; }
+  function checked(form, name) { var r = $('input[name="' + name + '"]:checked', form); return r ? r.value : ''; }
+  function labelOf(input) { return input ? input.parentNode.textContent.trim() : ''; }
+  /* The page's WhatsApp links carry the page's own journey and nothing a visitor typed. */
   (function () {
-    var first = $('[data-quote-form] input[name=service]:checked');
-    var href = waBase + '?text=' + encodeURIComponent(waText(first ? first.value : '', ''));
+    var j = $('form[data-kind=book] input[name=journey]:checked');
+    var href = waBase + '?text=' + encodeURIComponent(waText(labelOf(j), ''));
     $$('[data-wa-link]').forEach(function (a) { a.href = href; });
   })();
-
-  function productOf(form) {
-    var r = $('input[name=service]:checked', form);
-    var skey = r ? r.getAttribute('data-skey') : '';
-    /* A city named in the pick-up or drop-off location wins over the journey the page or the price finder set. */
-    var typed = [$('input[name=pickup]', form).value, $('input[name=destination]', form).value].join(' ');
-    var named = matchRoute(typed);
-    /* An airport transfer to another city is not the Budapest airport price: the price comes with the reply. */
-    if (skey === 'airport') return named ? '' : 'airport';
-    if (skey === 'hourly') return 'hourly';
-    if (skey === 'tour') return 'tours';
-    /* Otherwise the journey the route page or the price finder set. No guess beyond that: an unknown city
-       gets its price with the reply. */
-    if (skey === 'city') return named || matchRoute($('input[name=route]', form).value);
-    return '';
-  }
-  function updateSum(form) {
-    var box = $('[data-price-sum]', form); if (!box) return;
-    var product = productOf(form);
-    var pr = product ? priceFor(product, $('select[name=vehicle_class]', form).value) : null;
-    if (!pr) { box.hidden = true; return; }
-    $('[data-price-out]', box).textContent = pr.text;
-    $('[data-price-note]', box).textContent = L.price_note + (pr.min ? ' ' + L.min_hours.replace('{n}', pr.min) : '');
-    box.hidden = false;
-  }
-  function setDateMin(form) {
-    var t = new Date(); t.setMinutes(t.getMinutes() - t.getTimezoneOffset());
-    $('input[name=date]', form).min = t.toISOString().slice(0, 10);
-  }
   function newId() {
     try { return crypto.randomUUID(); } catch (e) { return String(Date.now()) + Math.random().toString(16).slice(2); }
   }
-  var forms = $$('[data-quote-form]');
-  forms.forEach(function (form) {
-    form._shown = performance.now();
-    var checked = $('input[name=service]:checked', form);
-    form._defaults = { product: form.getAttribute('data-product'), cls: $('select[name=vehicle_class]', form).value,
-      skey: checked ? checked.getAttribute('data-skey') : '', route: $('input[name=route]', form).value };
-    $('input[name=page]', form).value = location.pathname;
-    $('input[name=request_id]', form).value = newId();
-    setDateMin(form);
-    /* No endpoint configured: the form is a WhatsApp handoff and says so. Contact details are not asked for,
-       because WhatsApp identifies the sender and nothing personal should travel in a URL. */
-    if (!form.getAttribute('data-endpoint')) {
-      form.setAttribute('data-mode', 'whatsapp');
-      $$('[data-contact-field]', form).forEach(function (f) { f.hidden = true; $$('input', f).forEach(function (i) { i.required = false; i.disabled = true; }); });
-      $('button[type=submit]', form).textContent = L.whatsapp_action;
-      var fine = $('[data-fine]', form); if (fine) fine.textContent = L.handoff_note;
-    }
-    form.addEventListener('input', function () { updateSum(form); });
-    form.addEventListener('change', function () { updateSum(form); });
-    updateSum(form);
-    form.addEventListener('submit', function (e) { if (form._step === 1) { e.preventDefault(); goStep(form, 2); return; } submit(e, form); });
-    if (form.hasAttribute('data-steps')) {
-      var nx = $('[data-next]', form), bk = $('[data-back]', form), cp = $('[data-copy-recap]', form);
-      if (nx) nx.addEventListener('click', function () { goStep(form, 2); });
-      if (bk) bk.addEventListener('click', function () { goStep(form, 1, true); });
-      if (cp) cp.addEventListener('click', function () {
-        var txt = recap(form).join(' · ');
-        var ok = function () { var o = cp.textContent; cp.textContent = L.copied; setTimeout(function () { cp.textContent = o; }, 1600); };
-        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, function () {}); 
+  function today() { var t = new Date(); t.setMinutes(t.getMinutes() - t.getTimezoneOffset()); return t.toISOString().slice(0, 10); }
+  function niceDate(v) {
+    if (!v) return '';
+    /* English reads the European way here: "Wed 14 October 2026" */
+    try { return new Date(v + 'T12:00:00').toLocaleDateString(!root.lang || root.lang === 'en' ? 'en-GB' : root.lang, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return v; }
+  }
+
+  /* ---------- place picker ----------
+     Pick-up and drop-off come from a short list of verified places (the airport, stations, hotels, sights), so a
+     guest picks "Kempinski" instead of typing a street they may not know. Anything else can still be typed. The
+     map link opens Google Maps in a new tab; nothing is loaded from Google on this page. */
+  function fold(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim(); }
+  var GROUPS = {};
+  PLACES.forEach(function (p, n) {
+    p._n = fold(p.name); p._k = ' ' + fold([p.name, p.address].concat(p.aliases || []).join(' ')); p._i = n;
+    if (!(p.group in GROUPS)) GROUPS[p.group] = Object.keys(GROUPS).length;
+  });
+  function placeById(id) { return PLACES.filter(function (p) { return p.id === id; })[0] || null; }
+  function findPlaces(q) {
+    var f = fold(q);
+    if (!f) return PLACES.filter(function (p) { return p.top; });
+    var words = f.split(' ');
+    return PLACES.map(function (p) {
+      if (!words.every(function (w) { return p._k.indexOf(w) !== -1; })) return null;
+      return { p: p, s: p._n.indexOf(f) === 0 ? 0 : p._k.indexOf(' ' + words[0]) !== -1 ? 1 : 2 };
+    }).filter(Boolean).sort(function (a, b) { return a.s - b.s || a.p._i - b.p._i; }).slice(0, 8)
+      /* the best eight, shown under their group headings */
+      .sort(function (a, b) { return GROUPS[a.p.group] - GROUPS[b.p.group] || a.s - b.s || a.p._i - b.p._i; }).map(function (x) { return x.p; });
+  }
+  function mapLink(p) { return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(p.name + ', ' + p.address); }
+  function initPlace(box) {
+    var input = $('input[type=text]', box), addr = $('input[type=hidden]', box), list = $('.place__list', box), detail = $('[data-place-detail]', box);
+    var found = [], active = -1;
+    input.setAttribute('role', 'combobox'); input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-expanded', 'false'); input.setAttribute('aria-controls', list.id);
+    input._ph = input.placeholder;
+    var close = function () { list.hidden = true; box.classList.remove('is-open'); input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); active = -1; };
+    var paint = function () {
+      var p = box._place; detail.textContent = '';
+      box.classList.toggle('has-place', !!p);
+      if (!p) { detail.hidden = true; return; }
+      var a = d.createElement('span'); a.textContent = p.address; detail.appendChild(a);
+      var l = d.createElement('a'); l.href = mapLink(p); l.target = '_blank'; l.rel = 'noopener'; l.textContent = L.map; detail.appendChild(l);
+      detail.hidden = false;
+    };
+    var set = function (p, text) { box._place = p || null; input.value = p ? p.name : (text || ''); addr.value = p ? p.address : ''; paint(); };
+    var pick = function (n) { if (!found[n]) return; set(found[n]); close(); input.dispatchEvent(new Event('change', { bubbles: true })); };
+    var render = function () {
+      found = PLACES.length ? findPlaces(input.value) : []; active = -1; list.textContent = '';
+      var group = '';
+      found.forEach(function (p, n) {
+        if (p.group !== group) { group = p.group; var h = d.createElement('li'); h.className = 'place__group'; h.setAttribute('role', 'presentation'); h.textContent = group; list.appendChild(h); }
+        var li = d.createElement('li'); li.id = list.id + '-' + n; li.className = 'place__opt'; li.setAttribute('role', 'option'); li.setAttribute('aria-selected', 'false');
+        var nm = d.createElement('span'); nm.textContent = p.name; var ad = d.createElement('small'); ad.textContent = p.address;
+        li.appendChild(nm); li.appendChild(ad);
+        li.addEventListener('pointerdown', function (e) { e.preventDefault(); });   /* the field keeps the focus */
+        li.addEventListener('click', function () { pick(n); });
+        list.appendChild(li);
       });
-      goStep(form, 1, true, true);
+      var open = found.length > 0 && d.activeElement === input;
+      list.hidden = !open; box.classList.toggle('is-open', open);
+      input.setAttribute('aria-expanded', open ? 'true' : 'false'); input.removeAttribute('aria-activedescendant');
+    };
+    var move = function (step) {
+      var opts = $$('.place__opt', list); if (!opts.length) return;
+      active = (active + step + opts.length) % opts.length;
+      opts.forEach(function (o, n) { o.setAttribute('aria-selected', n === active ? 'true' : 'false'); });
+      input.setAttribute('aria-activedescendant', opts[active].id);
+      opts[active].scrollIntoView({ block: 'nearest' });
+    };
+    input.addEventListener('focus', render);
+    input.addEventListener('input', function () { box._place = null; addr.value = ''; paint(); render(); });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); if (list.hidden) render(); move(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); if (!list.hidden) move(-1); }
+      else if (e.key === 'Enter' && !list.hidden && active > -1) { e.preventDefault(); pick(active); }
+      else if (e.key === 'Escape' && !list.hidden) { e.preventDefault(); e.stopPropagation(); close(); }   /* the sheet stays open */
+    });
+    input.addEventListener('blur', function () {
+      close();
+      /* a listed place typed out in full counts as picked */
+      if (!box._place && input.value) {
+        var f = fold(input.value), hit = PLACES.filter(function (p) { return p._n === f; })[0];
+        if (hit) { set(hit); input.dispatchEvent(new Event('change', { bubbles: true })); }
+      }
+    });
+    box._set = set;
+  }
+
+  /* ---------- the fixed-price booking ---------- */
+  function show(form, key, on) {
+    $$('[data-show="' + key + '"]', form).forEach(function (el) {
+      el.hidden = !on;
+      $$('input,select,textarea', el).forEach(function (i) { i.disabled = !on; });
+    });
+  }
+  function isAirport(box) {
+    if (!box) return false;
+    if (box._place) return box._place.id === 'bud';
+    return /\b(airport|ferihegy|liszt ferenc|bud)\b|rept[eé]r/i.test($('input[type=text]', box).value) && !matchRoute($('input[type=text]', box).value);
+  }
+  function ridePrice(form, cls) {
+    var j = checked(form, 'journey'), all = PRICES.products || {};
+    if (j === 'tours') { var t = TOURS[field(form, 'tour')]; return cls === 'v' && t ? { eur: t.eur, text: money(t.eur) } : null; }
+    if (j === 'hourly') {
+      var r = all.hourly && all.hourly[cls]; if (r == null) return null;
+      var h = Math.max(all.hourly.min_hours || 1, Math.min(24, parseInt(field(form, 'hours'), 10) || 0));
+      return { eur: r * h, text: money(r * h), rate: money(r), hours: h };
     }
-  });
-
-  /* ---------- the request in two steps ----------
-     Step 1 is the journey, step 2 is who is asking. The journey is read back as one line before anything is
-     sent. Without JavaScript both steps simply show, so the form still works. */
-  function recap(form) {
-    var v = function (n) { var el = form.elements[n]; return el && el.value ? String(el.value).trim() : ''; };
-    var svc = $('input[name=service]:checked', form), cls = $('select[name=vehicle_class]', form);
-    var out = [];
-    if (svc) out.push(svc.value);
-    if (cls && cls.selectedOptions[0]) out.push(cls.selectedOptions[0].textContent);
-    var dv = v('date'), nice = dv;
-    if (dv) { try { nice = new Date(dv + 'T12:00:00').toLocaleDateString(d.documentElement.lang || 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) {} }
-    var when = [nice, v('time')].filter(Boolean).join(', '); if (when) out.push(when);
-    /* The hidden journey names the city pair or the tour; for the airport and hourly it adds nothing. */
-    var named = svc && /^(city|tour)$/.test(svc.getAttribute('data-skey'));
-    if (named && v('route')) out.push(v('route'));
-    if (v('pickup') || v('destination')) out.push([v('pickup'), v('destination')].filter(Boolean).join(' to '));
-    else if (!named && v('route')) out.push(v('route'));
-    if (v('passengers')) out.push(v('passengers') + ' ' + (v('passengers') === '1' ? L.pax_one : L.pax_many));
-    if (v('luggage')) out.push(v('luggage') + ' ' + (v('luggage') === '1' ? L.bag_one : L.bag_many));
-    if (v('flight_number')) out.push(v('flight_number'));
-    var product = productOf(form), pr = product && cls ? priceFor(product, cls.value) : null;
-    out.push(pr ? pr.text + ' ' + L.price_note : L.price_tbc);
-    return out;
+    var named = matchRoute([field(form, 'pickup'), field(form, 'destination')].join(' '));
+    if (j === 'airport') {
+      /* the airport price is Budapest Airport and Budapest: another city at either end is priced in the reply */
+      if (named) return null;
+      if (field(form, 'pickup') && field(form, 'destination') && !isAirport(form._pick) && !isAirport(form._drop)) return null;
+    } else if (named && named !== j) return null;   /* for example Vienna Airport typed on the Vienna route */
+    var p = all[j] && all[j][cls];
+    return p == null ? null : { eur: p, text: money(p) };
   }
-  function goStep(form, n, skipCheck, silent) {
-    var s1 = $('[data-step="1"]', form), s2 = $('[data-step="2"]', form); if (!s1 || !s2) return;
-    if (n === 2 && !skipCheck) {
-      clearErr(form);
-      var bad = $$('input,select,textarea', s1).filter(function (i) { return i.willValidate && !i.checkValidity(); });
-      if (bad.length) { bad.forEach(function (i) { setErr(i, i.validity.valueMissing ? L.required : L.invalid); }); bad[0].focus(); say(form, L.fix, 'error'); return; }
-      say(form, '');
+  function paintPrices(form) {
+    $$('.car', form).forEach(function (c) {
+      var pr = ridePrice(form, c.getAttribute('data-car')), out = $('[data-car-price]', c);
+      out.textContent = pr ? (pr.rate ? pr.rate + ' ' + L.per_hour : pr.text) : L.on_request;
+      c.classList.toggle('is-req', !pr);
+    });
+    var box = $('[data-price-sum]', form), out = $('[data-price-out]', box), note = $('[data-price-note]', box);
+    var pr = ridePrice(form, field(form, 'vehicle_class')), j = checked(form, 'journey');
+    var before = out.textContent;
+    if (pr) {
+      out.textContent = pr.text;
+      note.textContent = (pr.hours ? L.for_hours.replace('{n}', pr.hours).replace('{rate}', pr.rate) + ' ' : '') + L.price_note;
+    } else {
+      out.textContent = L.price_tbc;
+      note.textContent = j === 'airport' && !matchRoute([field(form, 'pickup'), field(form, 'destination')].join(' ')) ? L.airport_hint : '';
     }
-    form._step = n;
-    s1.hidden = n !== 1; s2.hidden = n !== 2;
-    var back = $('[data-back]', form); if (back) back.hidden = n !== 2;
-    var label = $('[data-step-label]', form); if (label) label.textContent = n === 1 ? L.step1 : L.step2;
-    if (n === 2) { var box = $('[data-recap]', form); if (box) { $('[data-recap-text]', box).textContent = recap(form).join(' · '); box.hidden = false; } }
-    if (!silent && label) { label.focus({ preventScroll: true }); var sc = form.closest('.formbox'); if (sc && sc.scrollTo) sc.scrollTo({ top: 0 }); }
+    box.classList.toggle('is-tbc', !pr);
+    box.hidden = false;
+    if (before && before !== out.textContent) { box.classList.remove('is-new'); void box.offsetWidth; box.classList.add('is-new'); }
+  }
+  function placeholders(form) {
+    var j = checked(form, 'journey'), city = (L.cities || {})[j];
+    var pick = $('input[name=pickup]', form), drop = $('input[name=destination]', form);
+    pick.placeholder = pick._ph; drop.placeholder = drop._ph;
+    if (city) ((j === 'vienna_airport') !== !!form._flip ? pick : drop).placeholder = L.abroad_ph.replace('{city}', city);
+  }
+  function setJourney(form) {
+    var j = checked(form, 'journey'), ride = j !== 'hourly' && j !== 'tours';
+    form.setAttribute('data-journey', j);
+    show(form, 'tours', j === 'tours'); show(form, 'hourly', j === 'hourly'); show(form, 'ride', ride); show(form, 'airport', j === 'airport');
+    /* an airport transfer needs its other end; on another city's side the address can follow in the chat */
+    $('input[name=destination]', form).required = j === 'airport';
+    /* the airport is filled in for an airport transfer, and taken out again if it was only our suggestion */
+    var bud = placeById('bud');
+    if (form._auto && (j !== 'airport') && form._auto._place === bud) { form._auto._set(null, ''); form._auto = null; }
+    if (j === 'airport' && bud && !field(form, 'pickup') && !field(form, 'destination')) { form._auto = form._flip ? form._drop : form._pick; form._auto._set(bud); }
+    /* private tours are V-Class tours */
+    $$('.car', form).forEach(function (c) { var off = j === 'tours' && c.getAttribute('data-car') !== 'v'; c.hidden = off; $('input', c).disabled = off; });
+    if (j === 'tours') { var v = $('.car[data-car=v] input', form); if (v) v.checked = true; }
+    placeholders(form); paintPrices(form);
   }
 
-  function openQuote(btn) {
-    if (!sheet || !sheet.showModal) { location.hash = '#quote'; return; }
-    var form = $('[data-quote-form]', sheet), def = form._defaults;
-    /* Start from the page defaults every time, so nothing from an earlier trigger leaks into this one.
-       The journey is hidden: the trigger names it, or the page default applies. Typed places are kept. */
-    var cls = (btn && btn.getAttribute('data-class')) || def.cls;
-    var product = (btn && btn.getAttribute('data-product')) || def.product;
-    var route = btn && btn.getAttribute('data-route');
-    var skey = product === 'airport' ? 'airport' : (product === 'hourly' || product === 'vip') ? 'hourly' : product === 'tours' ? 'tour' : ROUTES[product] ? 'city' : def.skey;
-    form.setAttribute('data-product', product);
-    $('select[name=vehicle_class]', form).value = cls;
-    var radio = $('input[data-skey="' + skey + '"]', form); if (radio) radio.checked = true;
-    $('input[name=route]', form).value = route || def.route || '';
-    var dt = btn && btn.getAttribute('data-date'); if (dt) $('input[name=date]', form).value = dt;
-    form._shown = performance.now();
-    updateSum(form);
-    if (form.hasAttribute('data-steps')) goStep(form, 1, true, true);
-    sheet.showModal();
-    track('quote_open');
-    var first = $('input[name=pickup]', form); if (first) first.focus();
-  }
-  d.addEventListener('click', function (e) {
-    var b = e.target.closest && e.target.closest('[data-open-quote]');
-    if (b) { e.preventDefault(); openQuote(b); }
-    if (e.target.closest && e.target.closest('[data-close-quote]')) sheet.close();
-    if (sheet && e.target === sheet) sheet.close();
-  });
-
+  /* ---------- both forms ---------- */
   function setErr(input, msg) {
     var group = input.type === 'radio' ? input.closest('fieldset') : null;
     var target = group || input, holder = group || input.closest('.field');
@@ -272,46 +313,74 @@
     if (state) status.setAttribute('data-state', state); else status.removeAttribute('data-state');
     status.textContent = text;
   }
-
-  function submit(e, form) {
-    e.preventDefault();
+  function valid(form) {
     clearErr(form);
     var bad = $$('input,select,textarea', form).filter(function (i) { return i.willValidate && !i.checkValidity(); });
-    if (bad.length) {
-      bad.forEach(function (i) { setErr(i, i.validity.valueMissing ? L.required : L.invalid); });
-      bad[0].focus(); say(form, L.fix, 'error'); return;
+    if (!bad.length) { say(form, ''); return true; }
+    bad.forEach(function (i) { setErr(i, i.validity.valueMissing ? L.required : L.invalid); });
+    var more = bad[0].closest('details'); if (more) more.open = true;
+    bad[0].focus(); say(form, L.fix, 'error');
+    return false;
+  }
+  function placeText(box, form, name) { var p = box && box._place; return p ? p.name + ', ' + p.address : field(form, name); }
+  function lines(form) {
+    var book = form.getAttribute('data-kind') === 'book', out = [];
+    var add = function (label, v) { if (v) out.push(label + ': ' + v); };
+    if (book) {
+      var j = checked(form, 'journey'), c = $('input[name=vehicle_class]:checked', form);
+      out.push(L.wa_book_hello);
+      add(L.f_journey, labelOf($('input[name=journey]:checked', form)));
+      if (j === 'tours' && TOURS[field(form, 'tour')]) add(L.f_tour, TOURS[field(form, 'tour')].label);
+      add(L.f_pickup, placeText(form._pick, form, 'pickup'));
+      if (j !== 'hourly' && j !== 'tours') add(L.f_dest, placeText(form._drop, form, 'destination'));
+      if (j === 'hourly') add(L.f_hours, field(form, 'hours'));
+      add(L.f_when, [niceDate(field(form, 'date')), field(form, 'time')].filter(Boolean).join(', '));
+      add(L.f_class, c ? $('.car__name', c.closest('.car')).textContent : '');
+      if (j === 'airport') add(L.f_flight, field(form, 'flight_number'));
+    } else {
+      var s = form.elements.vehicle_class;
+      out.push(L.wa_quote_hello);
+      add(L.f_request, field(form, 'message'));
+      add(L.f_date, niceDate(field(form, 'date')));
+      add(L.f_class, s && s.value ? s.selectedOptions[0].textContent : '');
     }
+    add(L.f_pax, field(form, 'passengers'));
+    add(L.f_bags, field(form, 'luggage'));
+    if ($('[data-other-toggle]', form).checked) add(L.f_passenger, [field(form, 'passenger_name'), field(form, 'passenger_phone'), field(form, 'company')].filter(Boolean).join(', '));
+    add(L.f_note, field(form, 'note'));
+    if (book) {
+      var pr = ridePrice(form, field(form, 'vehicle_class'));
+      out.push(L.wa_price + ': ' + (pr ? pr.text + (pr.hours ? ' ' + L.for_hours.replace('{n}', pr.hours).replace('{rate}', pr.rate) : '.') + ' ' + L.price_note : L.price_tbc));
+      out.push(L.wa_close);
+    }
+    return out;
+  }
+  function send(form, via) {
+    if (!valid(form)) return;
     /* Spam signals: the hidden field, and a send within 1.5 s of the form becoming visible. A trapped send is
        told to try again. It is never shown a success it did not have. */
-    if ($('input[name=website]', form).value || performance.now() - form._shown < 1500) { say(form, L.retry, 'error'); return; }
-    var btn = $('button[type=submit]', form);
-    if (btn.disabled) return;
-    var data = new FormData(form);
-    var product = productOf(form), pr = product ? priceFor(product, data.get('vehicle_class')) : null;
-    data.set('quoted_price', pr ? pr.text : 'on request');
-    data.set('product', product || '');
-    data.set('elapsed_ms', String(Math.round(performance.now() - form._shown)));
-    data.delete('website');
-
-    if (form.getAttribute('data-mode') === 'whatsapp') {
-      /* Journey details only. The visitor reviews and sends the message in WhatsApp: that is the contact,
-         so this counts as a WhatsApp click, not as a lead. */
-      var lines = [L.wa_hello, waText(data.get('service'), data.get('date'))];
-      var cityTrip = /^(city|tour)$/.test(($('input[name=service]:checked', form) || form).getAttribute('data-skey') || '');
-      [['route', L.f_route], ['pickup', L.f_pickup], ['destination', L.f_dest], ['time', L.f_time], ['vehicle_class', L.f_class], ['passengers', L.f_pax], ['luggage', L.f_bags], ['flight_number', L.f_flight], ['note', L.f_note]].filter(function (k) { return k[0] !== 'route' || cityTrip; }).forEach(function (k) {
-        if (data.get(k[0])) lines.push(k[1] + ': ' + (k[0] === 'vehicle_class' ? $('select[name=vehicle_class]', form).selectedOptions[0].textContent : data.get(k[0])));
-      });
-      lines.push(L.wa_price + ': ' + (pr ? pr.text : L.price_tbc));
-      lines.push(L.wa_close);
-      btn.disabled = true;
-      var w = window.open(waBase + '?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener');
+    if (field(form, 'website') || performance.now() - form._shown < 1500) { say(form, L.retry, 'error'); return; }
+    var book = form.getAttribute('data-kind') === 'book', product = book ? checked(form, 'journey') : 'quote';
+    var text = lines(form).join('\n');
+    if (via === 'whatsapp') {
+      /* The visitor reviews and sends the message in WhatsApp: that is the contact, so this counts as a
+         WhatsApp click, not as a lead. With noopener the return value is null even on success. */
+      var btn = $('button[type=submit]', form); btn.disabled = true;
+      window.open(waBase + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
       setTimeout(function () { btn.disabled = false; }, 2500);
-      /* With noopener the return value is null in most browsers even on success, so say what to do either way. */
       track('whatsapp_click', { method: 'form_handoff', product: product });
-      say(form, L.sent_whatsapp); void w; return;
+      say(form, L.sent_whatsapp); return;
     }
-
-    btn.disabled = true; say(form, L.sending);
+    if (via === 'mail') {
+      location.href = 'mailto:' + MAIL + '?subject=' + encodeURIComponent(book ? L.mail_book : L.mail_quote) + '&body=' + encodeURIComponent(text);
+      track('email_click', { method: 'form_handoff', product: product });
+      say(form, L.sent_mail); return;
+    }
+    var alt = $('[data-send-alt]', form);
+    var data = new FormData(form), pr = book ? ridePrice(form, field(form, 'vehicle_class')) : null;
+    data.set('quoted_price', pr ? pr.text : 'on request'); data.set('product', product); data.set('summary', text);
+    data.set('elapsed_ms', String(Math.round(performance.now() - form._shown))); data.delete('website');
+    alt.disabled = true; say(form, L.sending);
     /* Form-encoded keeps this a simple request: Apps Script has no OPTIONS handler. */
     fetch(form.getAttribute('data-endpoint'), { method: 'POST', body: new URLSearchParams(data), redirect: 'follow' })
       .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
@@ -321,14 +390,113 @@
         location.href = PRICES.thanks_url;
       })
       /* The backend dedups on request_id, so pressing send again after an unreadable response is safe. */
-      .catch(function () { btn.disabled = false; say(form, L.error, 'error'); });
+      .catch(function () { alt.disabled = false; say(form, L.error, 'error'); });
   }
+  function contactFields(form, on) {
+    $$('[data-contact-field]', form).forEach(function (f) { f.hidden = !on; $$('input', f).forEach(function (i) { i.disabled = !on; }); });
+  }
+  var forms = $$('[data-quote-form]');
+  forms.forEach(function (form) {
+    var book = form.getAttribute('data-kind') === 'book';
+    form._shown = performance.now();
+    $('input[name=page]', form).value = location.pathname;
+    $('input[name=request_id]', form).value = newId();
+    $$('input[type=date]', form).forEach(function (i) { i.min = today(); });
+    /* WhatsApp is the way in. With an endpoint, the second button reveals name and phone and posts the request. */
+    var direct = !!form.getAttribute('data-endpoint');
+    contactFields(form, false);
+    var alt = $('[data-send-alt]', form);
+    if (direct) alt.textContent = L.direct_action;
+    alt.addEventListener('click', function () {
+      if (!direct) { send(form, 'mail'); return; }
+      if (!form._direct) { form._direct = true; contactFields(form, true); alt.textContent = L.send_request; $('input[name=name]', form).focus(); return; }
+      send(form, 'post');
+    });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      /* WhatsApp after all: the chat says who is writing, so the name and phone fields step aside again */
+      if (form._direct) { form._direct = false; contactFields(form, false); alt.textContent = L.direct_action; }
+      send(form, 'whatsapp');
+    });
+    var ot = $('[data-other-toggle]', form), ob = $('[data-other-body]', form);
+    var other = function () { ob.hidden = !ot.checked; $$('input', ob).forEach(function (i) { i.disabled = !ot.checked; }); };
+    ot.addEventListener('change', other); other();
+    if (!book) return;
+    form._pick = $('[data-place=pickup]', form); form._drop = $('[data-place=destination]', form);
+    initPlace(form._pick); initPlace(form._drop);
+    form._defaults = { journey: checked(form, 'journey'), cls: checked(form, 'vehicle_class') || 'v' };
+    $$('input[name=journey]', form).forEach(function (r) { r.addEventListener('change', function () { setJourney(form); }); });
+    form.addEventListener('input', function (e) { if (e.target.name !== 'journey') paintPrices(form); });
+    form.addEventListener('change', function (e) { if (e.target.name !== 'journey') paintPrices(form); });
+    var sw = $('[data-swap]', form);
+    sw.addEventListener('click', function () {
+      var a = form._pick, b = form._drop, pa = a._place, ta = $('input[type=text]', a).value;
+      a._set(b._place, $('input[type=text]', b).value); b._set(pa, ta);
+      if (form._auto) form._auto = form._auto === a ? b : a;
+      form._flip = !form._flip; placeholders(form); paintPrices(form);
+      sw.classList.remove('is-turning'); void sw.offsetWidth; sw.classList.add('is-turning');
+    });
+    setJourney(form);
+  });
+
+  /* ---------- tabs ---------- */
+  var panels = $$('[data-panel]');
+  function setTab(panel, tab, focus) {
+    panel.setAttribute('data-tab', tab);
+    $$('[data-tab-btn]', panel).forEach(function (b) { var on = b.getAttribute('data-tab-btn') === tab; b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; if (on && focus) b.focus(); });
+    $$('[data-pane]', panel).forEach(function (p) { p.hidden = p.getAttribute('data-pane') !== tab; });
+    var f = $('[data-pane="' + tab + '"] form', panel); if (f) f._shown = performance.now();
+  }
+  panels.forEach(function (panel) {
+    $$('[data-tab-btn]', panel).forEach(function (b) {
+      b.addEventListener('click', function () { setTab(panel, b.getAttribute('data-tab-btn')); });
+      b.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setTab(panel, panel.getAttribute('data-tab') === 'book' ? 'quote' : 'book', true); }
+      });
+    });
+    setTab(panel, panel.getAttribute('data-start') || 'book');
+  });
+
+  /* ---------- the sheet ----------
+     Every "Book Your Chauffeur" and "Get a Free Quote" button opens it. The button names the journey, the class,
+     the tour or the date; everything else starts from the page's own defaults, and places already typed stay. */
+  function openSheet(btn) {
+    if (!sheet || !sheet.showModal) { location.hash = '#quote'; return; }
+    var panel = $('[data-panel]', sheet), book = $('form[data-kind=book]', sheet), quote = $('form[data-kind=quote]', sheet);
+    var g = function (a) { return (btn && btn.getAttribute(a)) || ''; };
+    var product = g('data-product'), cls = g('data-class'), label = g('data-route') || g('data-service');
+    var canBook = !product || JOURNEYS.indexOf(product) !== -1;
+    var tab = g('data-tab') || (canBook ? 'book' : 'quote');
+    setTab(panel, tab);
+    if (tab === 'book') {
+      var r = $('input[name=journey][value="' + (product && canBook ? product : book._defaults.journey) + '"]', book); if (r) r.checked = true;
+      var c = $('input[name=vehicle_class][value="' + (/^[evs]$/.test(cls) ? cls : book._defaults.cls) + '"]', book); if (c) c.checked = true;
+      var tour = g('data-tour');
+      if (tour) { var o = $$('option', book.elements.tour).filter(function (x) { return x.value.indexOf(tour + ':') === 0; })[0]; if (o) book.elements.tour.value = o.value; }
+      if (g('data-date')) book.elements.date.value = g('data-date');
+      setJourney(book);
+    } else {
+      if (label && !field(quote, 'message')) quote.elements.message.value = label + '. ';
+      if (/^(e|v|s|vip)$/.test(cls)) quote.elements.vehicle_class.value = cls;
+    }
+    sheet.showModal();
+    track('quote_open', { product: product || tab });
+  }
+  d.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-open-quote]');
+    if (b) { e.preventDefault(); openSheet(b); }
+    if (e.target.closest && e.target.closest('[data-close-quote]')) sheet.close();
+    if (sheet && e.target === sheet) sheet.close();
+  });
+  /* A link can open the sheet straight away: /#book-now or /#get-a-quote (for ads, mails, the owners' profiles). */
+  var direct = { '#book-now': 'book', '#get-a-quote': 'quote' }[location.hash];
+  if (direct && sheet && sheet.showModal) { var tb = d.createElement('button'); tb.setAttribute('data-tab', direct); openSheet(tb); }
   /* Back from the thank-you page out of bfcache: the form must be usable again. */
   window.addEventListener('pageshow', function (ev) {
     if (!ev.persisted) return;
     forms.forEach(function (form) {
-      $('button[type=submit]', form).disabled = false; say(form, '');
-      $('input[name=request_id]', form).value = newId(); setDateMin(form); form._shown = performance.now();
+      $('button[type=submit]', form).disabled = false; $('[data-send-alt]', form).disabled = false; say(form, '');
+      $('input[name=request_id]', form).value = newId(); form._shown = performance.now();
     });
   });
 
@@ -337,14 +505,14 @@
   if (quick) {
     var qs = $('[name=q_service]', quick), qr = $('[name=q_route]', quick), qc = $('[name=q_class]', quick), qd = $('[name=q_date]', quick);
     var out = $('[data-quick-price]', quick), go = $('[data-quick-go]', quick);
-    qd.min = $('[data-quote-form] input[name=date]').min;
+    qd.min = today();
     var sync = function () {
       var svc = qs.value;
       $$('option', qr).forEach(function (o) { var off = o.getAttribute('data-for') !== svc; o.hidden = off; o.disabled = off; });
       if (qr.selectedOptions[0] && qr.selectedOptions[0].disabled) { var f = $$('option', qr).filter(function (o) { return !o.disabled; })[0]; if (f) qr.value = f.value; }
       var product = qr.value, cls = qc.value, pr = priceFor(product, cls);
       while (out.firstChild) out.removeChild(out.firstChild);
-      /* say which class and journey the figure belongs to: the hero says from 65, this box may say 75 */
+      /* say which class and journey the figure belongs to */
       var what = d.createElement('span'); what.className = 'quick__what';
       what.textContent = (qc.selectedOptions[0] ? qc.selectedOptions[0].textContent : '') + (qr.selectedOptions[0] ? ', ' + qr.selectedOptions[0].textContent : '');
       out.appendChild(what);
@@ -415,6 +583,38 @@
       h.classList.add('reveal-words'); items.push(h);
     });
     $$('[data-route-line]').forEach(function (n) { items.push(n); });
+    /* the brass rule under a section label draws itself; the fleet page's cars glide in */
+    $$('.sec__head .eyebrow, .statement .eyebrow').forEach(function (n) { n.classList.add('draw-rule'); items.push(n); });
+    $$('.reveal-car').forEach(function (n) { items.push(n); });
+    /* siblings arrive one after another; the delay is dropped once they are in, so hovers stay instant */
+    $$('.reveal').forEach(function (n) {
+      var sib = Array.prototype.filter.call(n.parentNode.children, function (c) { return c.classList.contains('reveal'); });
+      n.style.setProperty('--i', String(Math.max(0, sib.indexOf(n))));
+    });
     items.forEach(function (n) { io.observe(n); });
+    d.addEventListener('transitionend', function (e) { if (e.target.classList && e.target.classList.contains('is-in')) e.target.style.removeProperty('--i'); });
+  }
+
+  /* ---------- staging preview panel ----------
+     Only on the preview build: the car ground and each piece of motion can be compared on and off. The choice
+     stays in this browser. The inline script in the head applies it before the first paint. */
+  var lab = $('[data-lab]');
+  if (lab) {
+    var LK = 'lab.v1', st = {};
+    try { st = JSON.parse(localStorage.getItem(LK) || '{}'); } catch (e) {}
+    st.off = st.off || []; st.cars = st.cars || 'studio';
+    var apply = function () {
+      ['plain', 'float'].forEach(function (k) { root.classList.toggle('lab-cars-' + k, st.cars === k); });
+      ['arrival', 'ambient', 'glide', 'unveil', 'rules', 'sheen'].forEach(function (k) { root.classList.toggle('lab-no-' + k, st.off.indexOf(k) !== -1); });
+      try { localStorage.setItem(LK, JSON.stringify(st)); } catch (e) {}
+    };
+    $$('input[name=lab-cars]', lab).forEach(function (r) { r.checked = r.value === st.cars; r.addEventListener('change', function () { st.cars = r.value; apply(); }); });
+    $$('[data-lab-motion]', lab).forEach(function (c) {
+      var k = c.getAttribute('data-lab-motion'); c.checked = st.off.indexOf(k) === -1;
+      c.addEventListener('change', function () { st.off = st.off.filter(function (x) { return x !== k; }); if (!c.checked) st.off.push(k); apply(); });
+    });
+    var lb = $('[data-lab-btn]', lab), lbox = $('#lab-box');
+    lb.addEventListener('click', function () { lbox.hidden = !lbox.hidden; lb.setAttribute('aria-expanded', lbox.hidden ? 'false' : 'true'); });
+    apply();
   }
 })();
