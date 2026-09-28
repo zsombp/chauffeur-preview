@@ -124,17 +124,16 @@
   function productOf(form) {
     var r = $('input[name=service]:checked', form);
     var skey = r ? r.getAttribute('data-skey') : '';
-    if (skey === 'airport') return 'airport';
+    /* A city named in the pick-up or drop-off location wins over the journey the page or the price finder set. */
+    var typed = [$('input[name=pickup]', form).value, $('input[name=destination]', form).value].join(' ');
+    var named = matchRoute(typed);
+    /* An airport transfer to another city is not the Budapest airport price: the price comes with the reply. */
+    if (skey === 'airport') return named ? '' : 'airport';
     if (skey === 'hourly') return 'hourly';
     if (skey === 'tour') return 'tours';
-    if (skey === 'city') {
-      /* What the visitor typed wins over the page preset, so a changed route never keeps the old price. */
-      var typed = $('input[name=route]', form).value;
-      var m = matchRoute(typed);
-      if (m) return m;
-      var preset = form.getAttribute('data-product');
-      return (!typed.trim() && ROUTES[preset]) ? preset : '';
-    }
+    /* Otherwise the journey the route page or the price finder set. No guess beyond that: an unknown city
+       gets its price with the reply. */
+    if (skey === 'city') return named || matchRoute($('input[name=route]', form).value);
     return '';
   }
   function updateSum(form) {
@@ -158,7 +157,7 @@
     form._shown = performance.now();
     var checked = $('input[name=service]:checked', form);
     form._defaults = { product: form.getAttribute('data-product'), cls: $('select[name=vehicle_class]', form).value,
-      skey: checked ? checked.getAttribute('data-skey') : '' };
+      skey: checked ? checked.getAttribute('data-skey') : '', route: $('input[name=route]', form).value };
     $('input[name=page]', form).value = location.pathname;
     $('input[name=request_id]', form).value = newId();
     setDateMin(form);
@@ -199,8 +198,11 @@
     var dv = v('date'), nice = dv;
     if (dv) { try { nice = new Date(dv + 'T12:00:00').toLocaleDateString(d.documentElement.lang || 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) {} }
     var when = [nice, v('time')].filter(Boolean).join(', '); if (when) out.push(when);
+    /* The hidden journey names the city pair or the tour; for the airport and hourly it adds nothing. */
+    var named = svc && /^(city|tour)$/.test(svc.getAttribute('data-skey'));
+    if (named && v('route')) out.push(v('route'));
     if (v('pickup') || v('destination')) out.push([v('pickup'), v('destination')].filter(Boolean).join(' to '));
-    else if (v('route')) out.push(v('route'));
+    else if (!named && v('route')) out.push(v('route'));
     if (v('passengers')) out.push(v('passengers') + ' ' + (v('passengers') === '1' ? L.pax_one : L.pax_many));
     if (v('luggage')) out.push(v('luggage') + ' ' + (v('luggage') === '1' ? L.bag_one : L.bag_many));
     if (v('flight_number')) out.push(v('flight_number'));
@@ -228,7 +230,7 @@
     if (!sheet || !sheet.showModal) { location.hash = '#quote'; return; }
     var form = $('[data-quote-form]', sheet), def = form._defaults;
     /* Start from the page defaults every time, so nothing from an earlier trigger leaks into this one.
-       Text the visitor typed into the route field is kept unless this trigger names a route. */
+       The journey is hidden: the trigger names it, or the page default applies. Typed places are kept. */
     var cls = (btn && btn.getAttribute('data-class')) || def.cls;
     var product = (btn && btn.getAttribute('data-product')) || def.product;
     var route = btn && btn.getAttribute('data-route');
@@ -236,14 +238,14 @@
     form.setAttribute('data-product', product);
     $('select[name=vehicle_class]', form).value = cls;
     var radio = $('input[data-skey="' + skey + '"]', form); if (radio) radio.checked = true;
-    if (route) $('input[name=route]', form).value = route;
+    $('input[name=route]', form).value = route || def.route || '';
     var dt = btn && btn.getAttribute('data-date'); if (dt) $('input[name=date]', form).value = dt;
     form._shown = performance.now();
     updateSum(form);
     if (form.hasAttribute('data-steps')) goStep(form, 1, true, true);
     sheet.showModal();
     track('quote_open');
-    var first = $('input[name=route]', form); if (first) first.focus();
+    var first = $('input[name=pickup]', form); if (first) first.focus();
   }
   d.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-open-quote]');
@@ -295,7 +297,8 @@
       /* Journey details only. The visitor reviews and sends the message in WhatsApp: that is the contact,
          so this counts as a WhatsApp click, not as a lead. */
       var lines = [L.wa_hello, waText(data.get('service'), data.get('date'))];
-      [['pickup', L.f_pickup], ['destination', L.f_dest], ['route', L.f_route], ['time', L.f_time], ['vehicle_class', L.f_class], ['passengers', L.f_pax], ['luggage', L.f_bags], ['flight_number', L.f_flight], ['note', L.f_note]].forEach(function (k) {
+      var cityTrip = /^(city|tour)$/.test(($('input[name=service]:checked', form) || form).getAttribute('data-skey') || '');
+      [['route', L.f_route], ['pickup', L.f_pickup], ['destination', L.f_dest], ['time', L.f_time], ['vehicle_class', L.f_class], ['passengers', L.f_pax], ['luggage', L.f_bags], ['flight_number', L.f_flight], ['note', L.f_note]].filter(function (k) { return k[0] !== 'route' || cityTrip; }).forEach(function (k) {
         if (data.get(k[0])) lines.push(k[1] + ': ' + (k[0] === 'vehicle_class' ? $('select[name=vehicle_class]', form).selectedOptions[0].textContent : data.get(k[0])));
       });
       lines.push(L.wa_price + ': ' + (pr ? pr.text : L.price_tbc));
