@@ -620,13 +620,61 @@
   if (lab) {
     var LK = 'lab.v1', st = {};
     try { st = JSON.parse(localStorage.getItem(LK) || '{}'); } catch (e) {}
-    st.off = st.off || []; st.cars = st.cars || 'studio';
+    st.off = st.off || []; st.cars = st.cars || 'studio'; st.atmo = st.atmo || [];
     var apply = function () {
       ['plain', 'float'].forEach(function (k) { root.classList.toggle('lab-cars-' + k, st.cars === k); });
       ['arrival', 'ambient', 'glide', 'unveil', 'rules', 'sheen'].forEach(function (k) { root.classList.toggle('lab-no-' + k, st.off.indexOf(k) !== -1); });
+      ['line', 'lights', 'texture', 'tide', 'drift'].forEach(function (k) { root.classList.toggle('atmo-' + k, st.atmo.indexOf(k) !== -1); });
       try { localStorage.setItem(LK, JSON.stringify(st)); } catch (e) {}
+      thread();
     };
+    /* The Danube line (atmosphere idea 1): a thin river in the left margin, from the end of the first section to
+       the booking block, with a small mark where each section begins and slow lights flowing down it. It needs a
+       margin of about 80 px, so it only appears on wide screens. Built from the page's own measurements. */
+    var threadAt = 0;
+    function thread() {
+      var old = $('.thread'); if (old) old.remove();
+      var main = $('#main'), first = main && main.firstElementChild, end = $('#quote'), inner = first && $('.wrap', first);
+      if (!root.classList.contains('atmo-line') || !first || !end || !inner) return;
+      var mr = main.getBoundingClientRect(), gut = inner.getBoundingClientRect().left - mr.left;
+      if (gut < 80) return;
+      var top = Math.round(first.getBoundingClientRect().bottom - mr.top + 24), bot = Math.round(end.getBoundingClientRect().top - mr.top - 48), H = bot - top;
+      if (H < 600) return;
+      var cx = Math.round(gut * 0.42), amp = Math.min(26, gut * 0.24), pts = [];
+      /* two slow waves over each other read as a river, not as a sine */
+      for (var y = 0; y <= H; y += 12) {
+        var a = amp * (0.55 + 0.45 * Math.sin(y / 1900 + 0.8));
+        pts.push((cx + a * Math.sin(y / 330 + 0.4) + a * 0.35 * Math.sin(y / 97 + 1.3)).toFixed(1) + ' ' + y);
+      }
+      var dpath = 'M' + pts.join(' L'), NS = 'http://www.w3.org/2000/svg';
+      var box = d.createElement('div'); box.className = 'thread'; box.setAttribute('aria-hidden', 'true');
+      box.style.top = top + 'px';
+      var svg = d.createElementNS(NS, 'svg'); svg.setAttribute('width', String(gut)); svg.setAttribute('height', String(H)); svg.setAttribute('viewBox', '0 0 ' + gut + ' ' + H);
+      var gap = 1200, flow = 42;
+      ['thread__base', 'thread__halo', 'thread__light'].forEach(function (c) {
+        var p = d.createElementNS(NS, 'path'); p.setAttribute('d', dpath); p.setAttribute('class', c);
+        if (c !== 'thread__base') { p.setAttribute('stroke-dasharray', (c === 'thread__halo' ? '150 ' : '110 ') + (gap - (c === 'thread__halo' ? 150 : 110))); p.style.setProperty('--gap', gap + 'px'); p.style.setProperty('--flow', flow + 's'); }
+        if (c === 'thread__halo') p.setAttribute('stroke-dashoffset', '20');
+        svg.appendChild(p);
+      });
+      /* a small mark where each section begins */
+      Array.prototype.forEach.call(main.children, function (sec) {
+        if (sec === first || sec === end) return;
+        var y = Math.round(sec.getBoundingClientRect().top - mr.top - top + 40);
+        if (y < 40 || y > H - 40) return;
+        var n = Math.round(y / 12), xy = (pts[n] || pts[pts.length - 1]).split(' ');
+        var c = d.createElementNS(NS, 'circle'); c.setAttribute('cx', xy[0]); c.setAttribute('cy', xy[1]); c.setAttribute('r', '3'); c.setAttribute('class', 'thread__stop');
+        svg.appendChild(c);
+      });
+      box.appendChild(svg); main.insertBefore(box, main.firstChild);
+    }
+    window.addEventListener('resize', function () { clearTimeout(threadAt); threadAt = setTimeout(thread, 200); });
+    window.addEventListener('load', function () { thread(); });
     $$('input[name=lab-cars]', lab).forEach(function (r) { r.checked = r.value === st.cars; r.addEventListener('change', function () { st.cars = r.value; apply(); }); });
+    $$('[data-lab-atmo]', lab).forEach(function (c) {
+      var k = c.getAttribute('data-lab-atmo'); c.checked = st.atmo.indexOf(k) !== -1;
+      c.addEventListener('change', function () { st.atmo = st.atmo.filter(function (x) { return x !== k; }); if (c.checked) st.atmo.push(k); apply(); });
+    });
     $$('[data-lab-motion]', lab).forEach(function (c) {
       var k = c.getAttribute('data-lab-motion'); c.checked = st.off.indexOf(k) === -1;
       c.addEventListener('change', function () { st.off = st.off.filter(function (x) { return x !== k; }); if (!c.checked) st.off.push(k); apply(); });
