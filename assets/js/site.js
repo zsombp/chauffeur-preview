@@ -109,9 +109,8 @@
      Vince, 2026-09-28: "Book Your Chauffeur" is for the rides with a fixed price, "Get a Free Quote" is a personal
      inquiry for a tailored offer. Both stay short ("just book it, we chase them for the rest") and both end in
      WhatsApp. Without an endpoint the form is a WhatsApp handover: the guest reads the message and sends it there.
-     Only what the guest typed for the journey travels in that link, and if they book for someone else, the
-     passenger's name and number, which is the point of that box. The sender's own details are never asked for:
-     the chat shows who is writing. */
+     The only required field is a phone number (Vince): what the guest typed, their phone and, if they book for
+     someone else, the passenger's details travel in that link, which the guest sends themselves. */
   var sheet = $('[data-sheet]');
   var waBase = 'https://wa.me/' + body.getAttribute('data-wa');
   var MAIL = body.getAttribute('data-mail') || '';
@@ -282,8 +281,6 @@
     var j = checked(form, 'journey'), ride = j !== 'hourly' && j !== 'tours';
     form.setAttribute('data-journey', j);
     show(form, 'tours', j === 'tours'); show(form, 'hourly', j === 'hourly'); show(form, 'ride', ride); show(form, 'airport', j === 'airport');
-    /* an airport transfer needs its other end; on another city's side the address can follow in the chat */
-    $('input[name=destination]', form).required = j === 'airport';
     /* the airport is filled in for an airport transfer, and taken out again if it was only our suggestion */
     var bud = placeById('bud');
     if (form._auto && (j !== 'airport') && form._auto._place === bud) { form._auto._set(null, ''); form._auto = null; }
@@ -315,9 +312,11 @@
   }
   function valid(form) {
     clearErr(form);
+    /* the one thing we need: a phone number, at least seven digits */
+    $$('input[name=phone]', form).forEach(function (i) { i.setCustomValidity(i.value && (i.value.match(/\d/g) || []).length < 7 ? L.phone_invalid : ''); });
     var bad = $$('input,select,textarea', form).filter(function (i) { return i.willValidate && !i.checkValidity(); });
     if (!bad.length) { say(form, ''); return true; }
-    bad.forEach(function (i) { setErr(i, i.validity.valueMissing ? L.required : L.invalid); });
+    bad.forEach(function (i) { setErr(i, i.validity.valueMissing ? L.required : i.validity.customError ? i.validationMessage : L.invalid); });
     var more = bad[0].closest('details'); if (more) more.open = true;
     bad[0].focus(); say(form, L.fix, 'error');
     return false;
@@ -331,8 +330,10 @@
       out.push(L.wa_book_hello);
       add(L.f_journey, labelOf($('input[name=journey]:checked', form)));
       if (j === 'tours' && TOURS[field(form, 'tour')]) add(L.f_tour, TOURS[field(form, 'tour')].label);
-      add(L.f_pickup, placeText(form._pick, form, 'pickup'));
-      if (j !== 'hourly' && j !== 'tours') add(L.f_dest, placeText(form._drop, form, 'destination'));
+      /* the airport we filled in ourselves only counts once the guest has given the other end too */
+      var auto = form._auto && form._auto._place && form._auto._place.id === 'bud' && !field(form, form._auto === form._pick ? 'destination' : 'pickup') ? form._auto : null;
+      if (form._pick !== auto) add(L.f_pickup, placeText(form._pick, form, 'pickup'));
+      if (j !== 'hourly' && j !== 'tours' && form._drop !== auto) add(L.f_dest, placeText(form._drop, form, 'destination'));
       if (j === 'hourly') add(L.f_hours, field(form, 'hours'));
       add(L.f_when, [niceDate(field(form, 'date')), field(form, 'time')].filter(Boolean).join(', '));
       add(L.f_class, c ? $('.car__name', c.closest('.car')).textContent : '');
@@ -348,6 +349,7 @@
     add(L.f_bags, field(form, 'luggage'));
     if ($('[data-other-toggle]', form).checked) add(L.f_passenger, [field(form, 'passenger_name'), field(form, 'passenger_phone'), field(form, 'company')].filter(Boolean).join(', '));
     add(L.f_note, field(form, 'note'));
+    add(L.f_phone, field(form, 'phone')); add(L.f_email, field(form, 'email')); add(L.f_name, field(form, 'name'));
     if (book) {
       var pr = ridePrice(form, field(form, 'vehicle_class'));
       out.push(L.wa_price + ': ' + (pr ? pr.text + (pr.hours ? ' ' + L.for_hours.replace('{n}', pr.hours).replace('{rate}', pr.rate) : '.') + ' ' + L.price_note : L.price_tbc));
@@ -392,9 +394,6 @@
       /* The backend dedups on request_id, so pressing send again after an unreadable response is safe. */
       .catch(function () { alt.disabled = false; say(form, L.error, 'error'); });
   }
-  function contactFields(form, on) {
-    $$('[data-contact-field]', form).forEach(function (f) { f.hidden = !on; $$('input', f).forEach(function (i) { i.disabled = !on; }); });
-  }
   var forms = $$('[data-quote-form]');
   forms.forEach(function (form) {
     var book = form.getAttribute('data-kind') === 'book';
@@ -402,22 +401,13 @@
     $('input[name=page]', form).value = location.pathname;
     $('input[name=request_id]', form).value = newId();
     $$('input[type=date]', form).forEach(function (i) { i.min = today(); });
-    /* WhatsApp is the way in. With an endpoint, the second button reveals name and phone and posts the request. */
+    /* WhatsApp is the way in. The second button sends the same by email, or, once the form has its own
+       endpoint, posts the request to the owners directly. */
     var direct = !!form.getAttribute('data-endpoint');
-    contactFields(form, false);
     var alt = $('[data-send-alt]', form);
     if (direct) alt.textContent = L.direct_action;
-    alt.addEventListener('click', function () {
-      if (!direct) { send(form, 'mail'); return; }
-      if (!form._direct) { form._direct = true; contactFields(form, true); alt.textContent = L.send_request; $('input[name=name]', form).focus(); return; }
-      send(form, 'post');
-    });
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      /* WhatsApp after all: the chat says who is writing, so the name and phone fields step aside again */
-      if (form._direct) { form._direct = false; contactFields(form, false); alt.textContent = L.direct_action; }
-      send(form, 'whatsapp');
-    });
+    alt.addEventListener('click', function () { send(form, direct ? 'post' : 'mail'); });
+    form.addEventListener('submit', function (e) { e.preventDefault(); send(form, 'whatsapp'); });
     var ot = $('[data-other-toggle]', form), ob = $('[data-other-body]', form);
     var other = function () { ob.hidden = !ot.checked; $$('input', ob).forEach(function (i) { i.disabled = !ot.checked; }); };
     ot.addEventListener('change', other); other();
