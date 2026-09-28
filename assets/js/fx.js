@@ -1,5 +1,5 @@
 /* Optional flourishes, kept apart from site.js so the core never depends on them.
-   1. Weighted inertia scrolling (mouse and trackpad only). OFF unless the visitor switches it on in the footer.
+   1. Weighted inertia scrolling (mouse and trackpad only). On by default again (Zsomb, 2026-09-28).
    1b. FAQ rows and the quote sheet open and close smoothly.
    2. The pills: rows of promises that lean away from the pointer and spring back (no library).
    3. A soft light that follows the pointer across tiles.
@@ -14,12 +14,13 @@
   /* ---------- 1. inertia scrolling ----------
      The wheel sets a target; the page eases towards it, so a flick carries on and settles like something with
      mass. Native scrolling stays in charge of everything else: touch, keyboard, scrollbar drag, find-in-page.
-     Easing is measured in time, so it feels the same at 60 and 120 Hz. Off by default: the footer has a toggle
-     (remembered in this browser) and ?inertia=on in the address does the same. */
+     Easing is measured in time, so it feels the same at 60 and 120 Hz. On by default (Zsomb, 2026-09-28, after two
+     weeks of native scrolling); ?inertia=off in the address, or the staging footer toggle, switches it off in this
+     browser. The key is new, so an "off" saved while it was opt-in does not carry over. */
   if (fine) {
-    var store = function (v) { try { if (v === undefined) return localStorage.getItem('inertia'); localStorage.setItem('inertia', v); } catch (e) { return null; } };
+    var store = function (v) { try { if (v === undefined) return localStorage.getItem('inertia.v2'); localStorage.setItem('inertia.v2', v); } catch (e) { return null; } };
     var q = /[?&]inertia=(on|off)/.exec(location.search); if (q) store(q[1]);
-    var on = store() === 'on';   /* native scrolling is the default (Zsomb, 2026-09-20): every premium reference ships it */
+    var on = store() !== 'off';
     var target = window.scrollY, cur = target, running = false, last = 0, frame = 0;
     var TAU = 115;                 /* ms; higher = heavier */
     var limit = function () { return Math.max(0, root.scrollHeight - window.innerHeight); };

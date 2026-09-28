@@ -89,6 +89,7 @@
   function priceFor(product, cls) {
     var all = PRICES.products || {};
     if (cls === 'vip' || product === 'vip') {
+      if (all.vip && all.vip.on_request) return null;   /* price and availability on request (Zsomb, 2026-09-28) */
       if (product === 'hourly' || product === 'vip') return { text: money(all.vip.rate) + ' ' + L.per_hour, hourly: true };
       return null;
     }
@@ -114,7 +115,7 @@
   var sheet = $('[data-sheet]');
   var waBase = 'https://wa.me/' + body.getAttribute('data-wa');
   var MAIL = body.getAttribute('data-mail') || '';
-  var PLACES = PRICES.places || [], TOURS = PRICES.tours || {}, JOURNEYS = PRICES.journeys || [];
+  var PLACES = PRICES.places || [], TOURS = PRICES.tours || {}, JOURNEYS = PRICES.journeys || [], CITIES = PRICES.cities || [];
   function waText(service, date) {
     var tpl = body.getAttribute('data-wa-text');
     /* Without a date the sentence must still read properly. */
@@ -124,10 +125,23 @@
   function field(form, name) { var el = form.elements[name]; return el && el.value != null ? String(el.value).trim() : ''; }
   function checked(form, name) { var r = $('input[name="' + name + '"]:checked', form); return r ? r.value : ''; }
   function labelOf(input) { return input ? input.parentNode.textContent.trim() : ''; }
+  /* "City to city" carries its city (Zsomb, 2026-09-28: four journeys, the city is picked inside). */
+  function productOf(form) { var j = checked(form, 'journey'); return j === 'city' ? field(form, 'city') : j; }
+  function routeText(form) {
+    var s = form.elements.city;
+    if (checked(form, 'journey') !== 'city' || !s || !s.value) return '';
+    var name = s.selectedOptions[0].textContent, abroadFirst = (s.value === 'vienna_airport') !== !!form._flip;
+    return L.city_route.replace('{a}', abroadFirst ? name : L.budapest).replace('{b}', abroadFirst ? L.budapest : name);
+  }
+  function journeyText(form) {
+    var label = labelOf($('input[name=journey]:checked', form)), r = routeText(form);
+    return r ? label + ', ' + r : label;
+  }
   /* The page's WhatsApp links carry the page's own journey and nothing a visitor typed. */
   (function () {
-    var j = $('form[data-kind=book] input[name=journey]:checked');
-    var href = waBase + '?text=' + encodeURIComponent(waText(labelOf(j), ''));
+    /* a route without a price yet (its page opens on the quote tab) names itself */
+    var bf = $('form[data-kind=book]'), own = body.getAttribute('data-wa-service');
+    var href = waBase + '?text=' + encodeURIComponent(waText(own || (bf ? routeText(bf) || labelOf($('input[name=journey]:checked', bf)) : ''), ''));
     $$('[data-wa-link]').forEach(function (a) { a.href = href; });
   })();
   function newId() {
@@ -235,7 +249,8 @@
     return /\b(airport|ferihegy|liszt ferenc|bud)\b|rept[eé]r/i.test($('input[type=text]', box).value) && !matchRoute($('input[type=text]', box).value);
   }
   function ridePrice(form, cls) {
-    var j = checked(form, 'journey'), all = PRICES.products || {};
+    var j = checked(form, 'journey'), key = productOf(form), all = PRICES.products || {};
+    if (cls === 'vip') return null;   /* the VIP line is priced in the reply */
     if (j === 'tours') { var t = TOURS[field(form, 'tour')]; return cls === 'v' && t ? { eur: t.eur, text: money(t.eur) } : null; }
     if (j === 'hourly') {
       var r = all.hourly && all.hourly[cls]; if (r == null) return null;
@@ -247,14 +262,14 @@
       /* the airport price is Budapest Airport and Budapest: another city at either end is priced in the reply */
       if (named) return null;
       if (field(form, 'pickup') && field(form, 'destination') && !isAirport(form._pick) && !isAirport(form._drop)) return null;
-    } else if (named && named !== j) return null;   /* for example Vienna Airport typed on the Vienna route */
-    var p = all[j] && all[j][cls];
+    } else if (named && named !== key) return null;   /* for example Vienna Airport typed on the Vienna route */
+    var p = all[key] && all[key][cls];
     return p == null ? null : { eur: p, text: money(p) };
   }
   function paintPrices(form) {
     $$('.car', form).forEach(function (c) {
       var pr = ridePrice(form, c.getAttribute('data-car')), out = $('[data-car-price]', c);
-      out.textContent = pr ? (pr.rate ? pr.rate + ' ' + L.per_hour : pr.text) : L.on_request;
+      out.textContent = pr ? (pr.rate ? pr.rate + ' ' + L.per_hour : pr.text) : c.getAttribute('data-car') === 'vip' ? L.vip_req : L.on_request;
       c.classList.toggle('is-req', !pr);
     });
     var box = $('[data-price-sum]', form), out = $('[data-price-out]', box), note = $('[data-price-note]', box);
@@ -265,22 +280,23 @@
       note.textContent = (pr.hours ? L.for_hours.replace('{n}', pr.hours).replace('{rate}', pr.rate) + ' ' : '') + L.price_note;
     } else {
       out.textContent = L.price_tbc;
-      note.textContent = j === 'airport' && !matchRoute([field(form, 'pickup'), field(form, 'destination')].join(' ')) ? L.airport_hint : '';
+      note.textContent = field(form, 'vehicle_class') === 'vip' ? L.vip_req : j === 'airport' && !matchRoute([field(form, 'pickup'), field(form, 'destination')].join(' ')) ? L.airport_hint : '';
     }
     box.classList.toggle('is-tbc', !pr);
     box.hidden = false;
     if (before && before !== out.textContent) { box.classList.remove('is-new'); void box.offsetWidth; box.classList.add('is-new'); }
   }
   function placeholders(form) {
-    var j = checked(form, 'journey'), city = (L.cities || {})[j];
+    var j = checked(form, 'journey'), key = productOf(form), city = j === 'city' ? (L.cities || {})[key] : '';
     var pick = $('input[name=pickup]', form), drop = $('input[name=destination]', form);
     pick.placeholder = pick._ph; drop.placeholder = drop._ph;
-    if (city) ((j === 'vienna_airport') !== !!form._flip ? pick : drop).placeholder = L.abroad_ph.replace('{city}', city);
+    if (city) ((key === 'vienna_airport') !== !!form._flip ? pick : drop).placeholder = L.abroad_ph.replace('{city}', city);
   }
   function setJourney(form) {
     var j = checked(form, 'journey'), ride = j !== 'hourly' && j !== 'tours';
     form.setAttribute('data-journey', j);
     show(form, 'tours', j === 'tours'); show(form, 'hourly', j === 'hourly'); show(form, 'ride', ride); show(form, 'airport', j === 'airport');
+    show(form, 'city', j === 'city');
     /* the airport is filled in for an airport transfer, and taken out again if it was only our suggestion */
     var bud = placeById('bud');
     if (form._auto && (j !== 'airport') && form._auto._place === bud) { form._auto._set(null, ''); form._auto = null; }
@@ -328,7 +344,7 @@
     if (book) {
       var j = checked(form, 'journey'), c = $('input[name=vehicle_class]:checked', form);
       out.push(L.wa_book_hello);
-      add(L.f_journey, labelOf($('input[name=journey]:checked', form)));
+      add(L.f_journey, journeyText(form));
       if (j === 'tours' && TOURS[field(form, 'tour')]) add(L.f_tour, TOURS[field(form, 'tour')].label);
       /* the airport we filled in ourselves only counts once the guest has given the other end too */
       var auto = form._auto && form._auto._place && form._auto._place.id === 'bud' && !field(form, form._auto === form._pick ? 'destination' : 'pickup') ? form._auto : null;
@@ -362,7 +378,7 @@
     /* Spam signals: the hidden field, and a send within 1.5 s of the form becoming visible. A trapped send is
        told to try again. It is never shown a success it did not have. */
     if (field(form, 'website') || performance.now() - form._shown < 1500) { say(form, L.retry, 'error'); return; }
-    var book = form.getAttribute('data-kind') === 'book', product = book ? checked(form, 'journey') : 'quote';
+    var book = form.getAttribute('data-kind') === 'book', product = book ? productOf(form) : 'quote';
     var text = lines(form).join('\n');
     if (via === 'whatsapp') {
       /* The visitor reviews and sends the message in WhatsApp: that is the contact, so this counts as a
@@ -417,7 +433,7 @@
     form._defaults = { journey: checked(form, 'journey'), cls: checked(form, 'vehicle_class') || 'v' };
     $$('input[name=journey]', form).forEach(function (r) { r.addEventListener('change', function () { setJourney(form); }); });
     form.addEventListener('input', function (e) { if (e.target.name !== 'journey') paintPrices(form); });
-    form.addEventListener('change', function (e) { if (e.target.name !== 'journey') paintPrices(form); });
+    form.addEventListener('change', function (e) { if (e.target.name === 'city') placeholders(form); if (e.target.name !== 'journey') paintPrices(form); });
     var sw = $('[data-swap]', form);
     sw.addEventListener('click', function () {
       var a = form._pick, b = form._drop, pa = a._place, ta = $('input[type=text]', a).value;
@@ -455,12 +471,14 @@
     var panel = $('[data-panel]', sheet), book = $('form[data-kind=book]', sheet), quote = $('form[data-kind=quote]', sheet);
     var g = function (a) { return (btn && btn.getAttribute(a)) || ''; };
     var product = g('data-product'), cls = g('data-class'), label = g('data-route') || g('data-service');
-    var canBook = !product || JOURNEYS.indexOf(product) !== -1;
+    var isCity = CITIES.indexOf(product) !== -1;
+    var canBook = !product || JOURNEYS.indexOf(product) !== -1 || isCity;
     var tab = g('data-tab') || (canBook ? 'book' : 'quote');
     setTab(panel, tab);
     if (tab === 'book') {
-      var r = $('input[name=journey][value="' + (product && canBook ? product : book._defaults.journey) + '"]', book); if (r) r.checked = true;
-      var c = $('input[name=vehicle_class][value="' + (/^[evs]$/.test(cls) ? cls : book._defaults.cls) + '"]', book); if (c) c.checked = true;
+      var r = $('input[name=journey][value="' + (isCity ? 'city' : product && canBook ? product : book._defaults.journey) + '"]', book); if (r) r.checked = true;
+      if (isCity && book.elements.city) book.elements.city.value = product;
+      var c = $('input[name=vehicle_class][value="' + (/^(e|v|s|vip)$/.test(cls) ? cls : book._defaults.cls) + '"]', book); if (c) c.checked = true;
       var tour = g('data-tour');
       if (tour) { var o = $$('option', book.elements.tour).filter(function (x) { return x.value.indexOf(tour + ':') === 0; })[0]; if (o) book.elements.tour.value = o.value; }
       if (g('data-date')) book.elements.date.value = g('data-date');
@@ -477,6 +495,17 @@
     if (b) { e.preventDefault(); openSheet(b); }
     if (e.target.closest && e.target.closest('[data-close-quote]')) sheet.close();
     if (sheet && e.target === sheet) sheet.close();
+  });
+  /* "Bratislava, Vienna Airport or another city? Get a free quote": the quote tab of the same panel, with the
+     request begun, so the guest only types the city. */
+  d.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-ask-quote]'), panel = b && b.closest('[data-panel]');
+    if (!panel) return;
+    setTab(panel, 'quote');
+    var q = $('form[data-kind=quote]', panel), m = q && q.elements.message;
+    if (!m) return;
+    if (!m.value) m.value = L.city_quote_prefill;
+    m.focus(); try { m.setSelectionRange(m.value.length, m.value.length); } catch (x) {}
   });
   /* A link can open the sheet straight away: /#book-now or /#get-a-quote (for ads, mails, the owners' profiles). */
   var direct = { '#book-now': 'book', '#get-a-quote': 'quote' }[location.hash];
@@ -511,7 +540,6 @@
       var span = d.createElement('span');
       span.textContent = pr ? (L.price_note + (pr.min ? ' ' + L.min_hours.replace('{n}', pr.min) : '')) : L.on_request_note;
       out.appendChild(span);
-      if (cls === 's') { var n = d.createElement('span'); n.className = 'chip'; n.textContent = L.s_note; out.appendChild(n); }
       go.setAttribute('data-product', product); go.setAttribute('data-class', cls);
       go.setAttribute('data-route', qr.selectedOptions[0] ? qr.selectedOptions[0].textContent : '');
       go.setAttribute('data-date', qd.value);
