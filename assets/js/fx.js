@@ -15,8 +15,8 @@
      The wheel sets a target; the page eases towards it, so a flick carries on and settles like something with
      mass. Native scrolling stays in charge of everything else: touch, keyboard, scrollbar drag, find-in-page.
      Easing is measured in time, so it feels the same at 60 and 120 Hz. On by default (Zsomb, 2026-09-28, after two
-     weeks of native scrolling); ?inertia=off in the address, or the staging footer toggle, switches it off in this
-     browser. The key is new, so an "off" saved while it was opt-in does not carry over. */
+     weeks of native scrolling); ?inertia=off in the address switches it off in this browser. The key is new, so an
+     "off" saved while it was opt-in does not carry over. The footer toggle left with the other dev options (09-29). */
   if (fine) {
     var store = function (v) { try { if (v === undefined) return localStorage.getItem('inertia.v2'); localStorage.setItem('inertia.v2', v); } catch (e) { return null; } };
     var q = /[?&]inertia=(on|off)/.exec(location.search); if (q) store(q[1]);
@@ -66,13 +66,6 @@
       if (history.replaceState) history.replaceState(null, '', a.getAttribute('href'));
       el.setAttribute('tabindex', '-1'); el.focus({ preventScroll: true });
     });
-    var wrap = d.querySelector('[data-inertia-wrap]'), tog = d.querySelector('[data-inertia-toggle]');
-    if (wrap && tog) {
-      var label = tog.querySelector('[data-inertia-state]'), words = [d.body.getAttribute('data-inertia-on') || 'on', d.body.getAttribute('data-inertia-off') || 'off'];
-      var paint = function () { tog.setAttribute('aria-pressed', on ? 'true' : 'false'); if (label) label.textContent = on ? words[0] : words[1]; };
-      wrap.hidden = false; paint();
-      tog.addEventListener('click', function () { on = !on; halt(); store(on ? 'on' : 'off'); paint(); });
-    }
   }
 
   /* ---------- 1b. rows that open and close smoothly ----------
