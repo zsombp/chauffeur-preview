@@ -139,9 +139,10 @@
   }
   /* The page's WhatsApp links carry the page's own journey and nothing a visitor typed. */
   (function () {
-    /* a route without a price yet (its page opens on the quote tab) names itself */
+    /* the page names its own service (airport, a route, hourly, tours); home and the general pages just say hello */
     var bf = $('form[data-kind=book]'), own = body.getAttribute('data-wa-service');
-    var href = waBase + '?text=' + encodeURIComponent(waText(own || (bf ? routeText(bf) || labelOf($('input[name=journey]:checked', bf)) : ''), ''));
+    var svc = own || (bf ? routeText(bf) || labelOf($('input[name=journey]:checked', bf)) : '');
+    var href = waBase + '?text=' + encodeURIComponent(svc ? waText(svc, '') : (L.wa_generic || waText('', '')));
     $$('[data-wa-link]').forEach(function (a) { a.href = href; });
   })();
   function newId() {
@@ -474,6 +475,7 @@
     var isCity = CITIES.indexOf(product) !== -1;
     var canBook = !product || JOURNEYS.indexOf(product) !== -1 || isCity;
     var tab = g('data-tab') || (canBook ? 'book' : 'quote');
+    if (!book) tab = 'quote';   /* no booking form (Vince, 2026-09-29): every button asks for a quote */
     setTab(panel, tab);
     if (tab === 'book') {
       var r = $('input[name=journey][value="' + (isCity ? 'city' : product && canBook ? product : book._defaults.journey) + '"]', book); if (r) r.checked = true;
@@ -484,8 +486,14 @@
       if (g('data-date')) book.elements.date.value = g('data-date');
       setJourney(book);
     } else {
-      if (label && !field(quote, 'message')) quote.elements.message.value = label + '. ';
-      if (/^(e|v|s|vip)$/.test(cls)) quote.elements.vehicle_class.value = cls;
+      /* the request starts with what the button knew: route or service, car, date and the price on the page */
+      var cn = (L.class_names || {})[cls] || '', bits = [label];
+      if (cn && label.indexOf(cn) === -1) bits.push(cn);
+      if (g('data-date')) bits.push(niceDate(g('data-date')));
+      if (g('data-price')) bits.push(L.price_shown.replace('{p}', g('data-price')));
+      var begun = bits.filter(Boolean).join(', ');
+      if (begun && !field(quote, 'message')) quote.elements.message.value = begun + '. ';
+      if (quote.elements.vehicle_class && /^(e|v|s|vip)$/.test(cls)) quote.elements.vehicle_class.value = cls;
     }
     sheet.showModal();
     track('quote_open', { product: product || tab });
@@ -543,6 +551,7 @@
       go.setAttribute('data-product', product); go.setAttribute('data-class', cls);
       go.setAttribute('data-route', qr.selectedOptions[0] ? qr.selectedOptions[0].textContent : '');
       go.setAttribute('data-date', qd.value);
+      go.setAttribute('data-price', pr ? pr.text : '');
     };
     [qs, qr, qc, qd].forEach(function (el) { el.addEventListener('change', sync); });
     sync();
