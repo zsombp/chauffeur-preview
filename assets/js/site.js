@@ -252,7 +252,7 @@
   function ridePrice(form, cls) {
     var j = checked(form, 'journey'), key = productOf(form), all = PRICES.products || {};
     if (cls === 'vip') return null;   /* the VIP line is priced in the reply */
-    if (j === 'tours') { var t = TOURS[field(form, 'tour')]; return cls === 'v' && t ? { eur: t.eur, text: money(t.eur) } : null; }
+    if (j === 'tours') { var t = TOURS[field(form, 'tour')]; return cls === 'v' && t && t.eur != null ? { eur: t.eur, text: money(t.eur) } : null; }
     if (j === 'hourly') {
       var r = all.hourly && all.hourly[cls]; if (r == null) return null;
       var h = Math.max(all.hourly.min_hours || 1, Math.min(24, parseInt(field(form, 'hours'), 10) || 0));
