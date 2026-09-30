@@ -81,11 +81,22 @@
     d.addEventListener('click', function (e) { if (nav.classList.contains('is-open') && !e.target.closest('[data-head]')) setMenu(false); });
     window.addEventListener('resize', function () { if (nav.classList.contains('is-open') && getComputedStyle(burger).display === 'none') setMenu(false); });
   }
+  /* The language picker is a <details>: it works without script; this closes it on Escape or a click elsewhere. */
+  var picker = $('[data-lang]');
+  if (picker) {
+    d.addEventListener('click', function (e) { if (picker.open && !e.target.closest('[data-lang]')) picker.open = false; });
+    d.addEventListener('keydown', function (e) { if (e.key === 'Escape' && picker.open) { picker.open = false; $('summary', picker).focus(); } });
+  }
 
   /* ---------- prices ----------
      A price is shown only when the owners stated one for exactly this product and class. The VIP rate is an
-     hourly rate: it is never shown for a fixed route, the airport or a tour. */
-  function money(n) { return '€' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+     hourly rate: it is never shown for a fixed route, the airport or a tour. Written the page language's way
+     (build.py MONEY): €1,150 in English, 1.150 € in German; right to left pages keep the amount left to right. */
+  var M = L.money || { pre: '€', post: '', sep: ',' };
+  function money(n) {
+    var s = M.pre + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, M.sep) + M.post;
+    return M.iso ? '⁦' + s + '⁩' : s;
+  }
   function priceFor(product, cls) {
     var all = PRICES.products || {};
     if (cls === 'vip' || product === 'vip') {
@@ -97,12 +108,17 @@
     if (!p || p[cls] == null) return null;
     return p.unit === 'hour' ? { text: money(p[cls]) + ' ' + L.per_hour, hourly: true, min: p.min_hours } : { text: money(p[cls]) };
   }
+  /* A typed place names a priced city in any of the site's languages (2026-09-30), declined forms included
+     (Wiedniu, Vídni, Bécsbe). The fields arrive joined with " | ": Vienna's airport is Vienna and an airport word in
+     the same field, so a Budapest Airport pick-up to a Vienna hotel stays the city fare. */
+  var VIENNA = /vienna|vienne|viena|wien|wenen|b[eé]cs|wiede[nń]|wiedni|v[ií]de[nň]|v[ií]dn[ěeií]|viede[nň]|viedn[ei]|וינה|فيينا|维也纳|ウィーン|(^|[\s,.(])빈(?=$|[\s,.)]|공항|국제)/;
+  var AIRPORT = /airport|flughafen|a[eé]roport|aeropuerto|luchthaven|lotnisk|leti[sš]t|letisk|rep[uü]l[oő]t[eé]r|rept[eé]r|שדה התעופה|נמל התעופה|مطار|机场|空港|공항/;
   function matchRoute(text) {
     text = (text || '').toLowerCase();
-    if (/vienna airport|schwechat|\bvie\b/.test(text)) return 'vienna_airport';
-    if (/vienna|wien|b[eé]cs/.test(text)) return 'vienna';
-    if (/prague|praha|pr[aá]ga/.test(text)) return 'prague';
-    if (/bratislava|pozsony/.test(text)) return 'bratislava';
+    if (/schwechat|\bvie\b/.test(text) || text.split('|').some(function (f) { return VIENNA.test(f) && AIRPORT.test(f); })) return 'vienna_airport';
+    if (VIENNA.test(text)) return 'vienna';
+    if (/prag|praha|prahy|praze|praag|פראג|براغ|布拉格|プラハ|프라하/.test(text)) return 'prague';
+    if (/bratislav|bratysław|pozsony|pressburg|ברטיסלבה|براتيسلافا|布拉迪斯拉发|ブラチスラ|브라티슬라바/.test(text)) return 'bratislava';
     return '';
   }
 
@@ -135,7 +151,7 @@
   }
   function journeyText(form) {
     var label = labelOf($('input[name=journey]:checked', form)), r = routeText(form);
-    return r ? label + ', ' + r : label;
+    return r ? label + (L.pair_sep || ', ') + r : label;
   }
   /* The page's WhatsApp links carry the page's own journey and nothing a visitor typed. */
   (function () {
@@ -247,7 +263,8 @@
   function isAirport(box) {
     if (!box) return false;
     if (box._place) return box._place.id === 'bud';
-    return /\b(airport|ferihegy|liszt ferenc|bud)\b|rept[eé]r/i.test($('input[type=text]', box).value) && !matchRoute($('input[type=text]', box).value);
+    var v = $('input[type=text]', box).value;   /* the airport named in any of the site's languages */
+    return (/\b(ferihegy|liszt ferenc|bud)\b/i.test(v) || AIRPORT.test(v.toLowerCase())) && !matchRoute(v);
   }
   function ridePrice(form, cls) {
     var j = checked(form, 'journey'), key = productOf(form), all = PRICES.products || {};
@@ -258,7 +275,7 @@
       var h = Math.max(all.hourly.min_hours || 1, Math.min(24, parseInt(field(form, 'hours'), 10) || 0));
       return { eur: r * h, text: money(r * h), rate: money(r), hours: h };
     }
-    var named = matchRoute([field(form, 'pickup'), field(form, 'destination')].join(' '));
+    var named = matchRoute([field(form, 'pickup'), field(form, 'destination')].join(' | '));
     if (j === 'airport') {
       /* the airport price is Budapest Airport and Budapest: another city at either end is priced in the reply */
       if (named) return null;
@@ -281,7 +298,7 @@
       note.textContent = (pr.hours ? L.for_hours.replace('{n}', pr.hours).replace('{rate}', pr.rate) + ' ' : '') + L.price_note;
     } else {
       out.textContent = L.price_tbc;
-      note.textContent = field(form, 'vehicle_class') === 'vip' ? L.vip_req : j === 'airport' && !matchRoute([field(form, 'pickup'), field(form, 'destination')].join(' ')) ? L.airport_hint : '';
+      note.textContent = field(form, 'vehicle_class') === 'vip' ? L.vip_req : j === 'airport' && !matchRoute([field(form, 'pickup'), field(form, 'destination')].join(' | ')) ? L.airport_hint : '';
     }
     box.classList.toggle('is-tbc', !pr);
     box.hidden = false;
