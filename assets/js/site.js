@@ -49,9 +49,13 @@
     $('[data-consent-reject]').addEventListener('click', function () { setConsent('denied'); });
     $$('[data-consent-open]').forEach(function (b) { b.addEventListener('click', function () { banner.hidden = false; $('[data-consent-accept]').focus(); }); });
   }
-  /* Events never carry form content: only the event name and the product key. */
+  /* Events never carry form content: only the event name and the product key. Every event also names its page
+     (page_key: the page's key, the same in every language, e.g. race_day) and its language (page_language): the
+     owners' landing-page brief of 2026-10-22 asks for both on every event. */
   function track(name, params) {
     params = params || {}; params.product = params.product || body.getAttribute('data-page');
+    params.page_key = body.getAttribute('data-page');
+    params.page_language = params.page_language || d.documentElement.lang;
     if (loaded && granted) gtag('event', name, params);
     try { d.dispatchEvent(new CustomEvent('site:track', { detail: { name: name, params: params } })); } catch (e) {}
   }
@@ -399,17 +403,18 @@
     var book = form.getAttribute('data-kind') === 'book', product = book ? productOf(form) : 'quote';
     var text = lines(form).join('\n');
     if (via === 'whatsapp') {
-      /* The visitor reviews and sends the message in WhatsApp: that is the contact, so this counts as a
-         WhatsApp click, not as a lead. With noopener the return value is null even on success. */
+      /* The visitor reviews and sends the message in WhatsApp. The owners' measurement spec (2026-10-20) counts
+         the hand-over as the form's send: form_submit, not whatsapp_click, so the two key events do not double
+         count. With noopener the return value is null even on success. */
       var btn = $('button[type=submit]', form); btn.disabled = true;
       window.open(waBase + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
       setTimeout(function () { btn.disabled = false; }, 2500);
-      track('whatsapp_click', { method: 'form_handoff', product: product });
+      track('form_submit', { method: 'whatsapp', product: product });
       say(form, L.sent_whatsapp); return;
     }
     if (via === 'mail') {
       location.href = 'mailto:' + MAIL + '?subject=' + encodeURIComponent(book ? L.mail_book : L.mail_quote) + '&body=' + encodeURIComponent(text);
-      track('email_click', { method: 'form_handoff', product: product });
+      track('form_submit', { method: 'email', product: product });
       say(form, L.sent_mail); return;
     }
     var alt = $('[data-send-alt]', form);
@@ -422,7 +427,7 @@
       .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .then(function (res) {
         if (!res || res.ok !== true) throw new Error('rejected');
-        track('generate_lead', { method: 'form', product: product });
+        track('form_submit', { method: 'form', product: product });
         location.href = PRICES.thanks_url;
       })
       /* The backend dedups on request_id, so pressing send again after an unreadable response is safe. */
@@ -570,9 +575,46 @@
       go.setAttribute('data-date', qd.value);
       go.setAttribute('data-price', pr ? pr.text : '');
     };
-    [qs, qr, qc, qd].forEach(function (el) { el.addEventListener('change', sync); });
+    /* calc_use: the first change a visitor makes in the price finder, once per page view (the owners' spec). */
+    var calcSeen = false;
+    [qs, qr, qc, qd].forEach(function (el) { el.addEventListener('change', function () {
+      sync(); if (!calcSeen) { calcSeen = true; track('calc_use', { product: qr.value }); }
+    }); });
     sync();
   }
+
+  /* ---------- the landing pages' price finder (2026-10-24) ----------
+     Package, class and hours beyond the package, priced from the page's own table (the figures ride on the options;
+     the extra hour on the form). A class without a figure is on request. calc_use fires on the first change, once per
+     page view, as on the home page. The quote button carries what was chosen. */
+  $$('[data-calc]').forEach(function (calc) {
+    var row = calc.elements.row, cls = calc.elements.cls, hrs = calc.elements.hours;
+    var out = $('[data-calc-out]', calc), go = $('[data-calc-go]', calc), seen = false;
+    var sync = function () {
+      var o = row.selectedOptions[0], c = cls.value, ext = o.getAttribute('data-extend') === '1';
+      hrs.disabled = !ext;
+      var n = ext ? Math.max(0, Math.min(12, parseInt(hrs.value, 10) || 0)) : 0;
+      if (!ext) hrs.value = '0';
+      var base = o.getAttribute('data-' + c), rate = calc.getAttribute('data-extra-' + c);
+      var total = base ? Number(base) + (n && rate ? n * Number(rate) : 0) : null;
+      if (n && !rate) total = null;
+      var what = (cls.selectedOptions[0] ? cls.selectedOptions[0].textContent : '') + (L.pair_sep || ', ') + o.textContent +
+        (n ? (L.pair_sep || ', ') + '+' + n + ' ' + calc.getAttribute('data-hours-label') : '');
+      while (out.firstChild) out.removeChild(out.firstChild);
+      var w = d.createElement('span'); w.className = 'quick__what'; w.textContent = what; out.appendChild(w);
+      var s = d.createElement('strong'); s.className = 'num'; s.textContent = total == null ? L.on_request : money(total); out.appendChild(s);
+      var note = d.createElement('span'); note.textContent = total == null ? L.on_request_note : L.price_note; out.appendChild(note);
+      go.setAttribute('data-route', calc.getAttribute('data-service') + ': ' + o.textContent + (n ? (L.pair_sep || ', ') + '+' + n + ' ' + calc.getAttribute('data-hours-label') : ''));
+      go.setAttribute('data-class', c);
+      if (total == null) go.removeAttribute('data-price'); else go.setAttribute('data-price', money(total));
+    };
+    [row, cls, hrs].forEach(function (el) {
+      el.addEventListener(el === hrs ? 'input' : 'change', function () {
+        sync(); if (!seen) { seen = true; track('calc_use', { product: calc.getAttribute('data-key') }); }
+      });
+    });
+    sync();
+  });
 
   /* ---------- film ----------
      A short rendered film that plays by itself when it comes into view, holds its last frame and can be played
